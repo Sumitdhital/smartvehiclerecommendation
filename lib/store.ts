@@ -3,9 +3,16 @@ import { FilterParams } from './recommend-engine';
 
 interface AppState {
   // Search Filters
-  searchFilters: Partial<FilterParams>;
-  setSearchFilters: (filters: Partial<FilterParams>) => void;
-  updateSearchFilter: (key: keyof FilterParams, value: any) => void;
+  searchFilters: Partial<FilterParams> & {
+    selectedBrand?: string;
+    selectedModel?: string;
+    searchTerm?: string;
+    showDiscountedOnly?: boolean;
+    viewMode?: 'detailed' | 'compact';
+    sortBy?: string;
+  };
+  setSearchFilters: (filters: Partial<AppState['searchFilters']>) => void;
+  updateSearchFilter: (key: keyof AppState['searchFilters'], value: any) => void;
 
   // Comparison
   compareVehicles: any[];
@@ -21,8 +28,15 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   searchFilters: {
     budget: 5000000, // Default 50L NPR
+    viewMode: 'detailed',
+    sortBy: 'rating',
+    selectedBrand: '',
+    selectedModel: '',
+    searchTerm: '',
+    showDiscountedOnly: false,
   },
-  setSearchFilters: (filters) => set({ searchFilters: filters }),
+  setSearchFilters: (filters) => 
+    set((state) => ({ searchFilters: { ...state.searchFilters, ...filters } })),
   updateSearchFilter: (key, value) => 
     set((state) => ({ 
       searchFilters: { ...state.searchFilters, [key]: value } 
@@ -45,3 +59,4 @@ export const useAppStore = create<AppState>((set) => ({
   lastResults: [],
   setLastResults: (results) => set({ lastResults: results }),
 }));
+

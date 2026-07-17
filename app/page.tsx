@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useAppStore } from "@/lib/store";
 import { getVehicles, getUsedListings, ExtendedVehicle } from "@/lib/vehicles-db";
 import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { UserMenu } from "@/components/auth/UserMenu";
 
 // Simple custom inline SVG components for icons to ensure zero dependency mismatch issues
 const BatteryIcon = () => (
@@ -89,6 +90,15 @@ function CarsDropdown({ activeFuel }: { activeFuel: string }) {
             <span className="text-base">⛽</span> Petrol
             {activeFuel === 'petrol' && <span className="ml-auto text-[10px] bg-orange-500 text-white rounded-full px-1.5 py-0.5">active</span>}
           </Link>
+          <Link
+            href="/?fuel=diesel"
+            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold transition-colors ${
+              activeFuel === 'diesel' ? 'bg-amber-50 text-amber-700' : 'text-slate-700 hover:bg-slate-50 hover:text-amber-700'
+            }`}
+          >
+            <span className="text-base">🛢️</span> Diesel
+            {activeFuel === 'diesel' && <span className="ml-auto text-[10px] bg-amber-600 text-white rounded-full px-1.5 py-0.5">active</span>}
+          </Link>
           <div className="my-1 border-t border-slate-100" />
           <Link
             href="/"
@@ -102,7 +112,7 @@ function CarsDropdown({ activeFuel }: { activeFuel: string }) {
   );
 }
 
-export default function EVNepalHome() {
+function HomeContent() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -120,6 +130,9 @@ export default function EVNepalHome() {
   const [sortBy, setSortBy] = useState("rating");
   const [viewMode, setViewMode] = useState<"detailed" | "compact">("detailed");
 
+  // Mobile navigation menu (shown below the lg breakpoint)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // Used listing index (for simple carousel slider)
   const [usedSliderIndex, setUsedSliderIndex] = useState(0);
 
@@ -130,18 +143,22 @@ export default function EVNepalHome() {
   const [interestRate, setInterestRate] = useState(8.5);
 
   // Dropdown brands & models lists
-  const BRANDS = ["BYD", "Tata", "Citroen", "KIA", "XPENG", "Wuling", "Seres", "BAW", "Avatr", "MG"];
+  const BRANDS = ["BYD", "Tata", "Citroen", "KIA", "XPENG", "Wuling", "Seres", "BAW", "Avatr", "MG", "Toyota", "Honda", "Suzuki", "Hyundai"];
   const MODELS_BY_BRAND: Record<string, string[]> = {
     "BYD": ["Dolphin", "Atto 1", "Atto 2", "Atto 3", "Seal"],
     "Tata": ["Tiago EV", "Nexon EV", "Punch EV"],
     "Citroen": ["E-C3"],
-    "KIA": ["EV9"],
+    "KIA": ["EV9", "Sonet"],
     "XPENG": ["G6"],
     "Wuling": ["Bingo"],
     "Seres": ["Seres 3"],
     "BAW": ["E7 Pro"],
     "Avatr": ["Avatr 11"],
-    "MG": ["ZS EV", "MG4 EV"]
+    "MG": ["ZS EV", "MG4 EV"],
+    "Toyota": ["Fortuner"],
+    "Honda": ["City"],
+    "Suzuki": ["Swift"],
+    "Hyundai": ["Creta"]
   };
 
   const currentModels = brandFilter ? MODELS_BY_BRAND[brandFilter] || [] : [];
@@ -166,6 +183,7 @@ export default function EVNepalHome() {
     setModelFilter("");
     setDiscountFilter(false);
     setMaxPriceLimit(undefined);
+    if (fuelFilter) router.push("/");
   };
 
   // Compare Checkbox Handler
@@ -207,8 +225,8 @@ export default function EVNepalHome() {
 
             {/* Desktop Navigation Links */}
             <nav className="hidden lg:flex items-center gap-6 text-sm font-semibold text-slate-600">
-              <Link href="/" className="text-blue-600 hover:text-blue-700 transition-colors">Find an EV</Link>
-              <Link href="#used-marketplace" className="hover:text-blue-600 transition-colors">Used EVs</Link>
+              <Link href="/" className="text-blue-600 hover:text-blue-700 transition-colors">Find cars</Link>
+              <Link href="#used-marketplace" className="hover:text-blue-600 transition-colors">Used car</Link>
               {/* Cars dropdown */}
               <CarsDropdown activeFuel={fuelFilter} />
               <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare</Link>
@@ -232,11 +250,58 @@ export default function EVNepalHome() {
                 </span>
               </Link>
             )}
-            <button className="border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold px-5 py-2 rounded-xl text-sm transition-colors">
-              Sign In
+            <UserMenu signInClassName="border border-slate-200 text-slate-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 font-bold px-4 sm:px-5 py-2 rounded-xl text-sm transition-all duration-200" />
+
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen((o) => !o)}
+              className="lg:hidden p-2 -mr-1 text-slate-600 hover:text-blue-600 transition-colors"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+              )}
             </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Panel */}
+        {mobileMenuOpen && (
+          <nav className="lg:hidden border-t border-slate-100 bg-white px-4 sm:px-6 py-4 flex flex-col gap-1 text-sm font-semibold text-slate-700 shadow-sm">
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Find cars</Link>
+            <Link href="#used-marketplace" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Used car</Link>
+
+            {/* Cars — fuel type filters (same filter as the sidebar) */}
+            <div className="mt-1 px-3 pt-2 pb-1 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Cars</div>
+            <div className="grid grid-cols-2 gap-2 px-1">
+              {[
+                { label: "⚡ EV", href: "/?fuel=ev", key: "ev", active: "bg-blue-50 text-blue-600 border-blue-200" },
+                { label: "⛽ Petrol", href: "/?fuel=petrol", key: "petrol", active: "bg-orange-50 text-orange-600 border-orange-200" },
+                { label: "🛢️ Diesel", href: "/?fuel=diesel", key: "diesel", active: "bg-amber-50 text-amber-700 border-amber-200" },
+                { label: "🚗 All Cars", href: "/", key: "", active: "bg-slate-100 text-slate-700 border-slate-200" },
+              ].map((item) => (
+                <Link
+                  key={item.key || "all"}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3 py-2.5 rounded-xl border text-center transition-colors ${
+                    fuelFilter === item.key
+                      ? item.active
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+
+            <Link href="/compare" onClick={() => setMobileMenuOpen(false)} className="mt-1 px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Compare</Link>
+            <div className="px-3 py-2.5 rounded-xl text-slate-400">Tools</div>
+          </nav>
+        )}
       </header>
 
       {/* 2. Main Page Layout */}
@@ -252,49 +317,27 @@ export default function EVNepalHome() {
           </p>
         </div>
 
-        {/* Hero Tiago EV Banner Advertisement */}
-        <div className="w-full bg-gradient-to-r from-amber-50 via-yellow-100/60 to-yellow-50/70 border border-yellow-200/50 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm overflow-hidden relative">
-          <div className="absolute -top-12 -right-12 w-48 h-48 bg-yellow-300/10 rounded-full blur-2xl"></div>
-          
-          <div className="flex flex-col md:flex-row items-center gap-6 z-10">
-            {/* Ad Sponsor Badge */}
-            <div className="flex-shrink-0 bg-white border border-yellow-300 px-4 py-2.5 rounded-xl shadow-sm text-center">
-              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Sponsored</p>
-              <div className="text-xl font-black text-slate-800 tracking-tighter flex items-center justify-center mt-0.5">
-                <span className="text-blue-600">TATA</span>
-                <span className="text-yellow-600 ml-1">ev</span>
-              </div>
-            </div>
-
-            <div className="text-center md:text-left">
-              <h3 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">Save More. Tiago.ev</h3>
-              <p className="text-sm font-semibold text-slate-600 mt-1">
-                Downpayment Starting at <span className="text-blue-600 font-black">Rs. 3.5 Lakhs</span>
-              </p>
-              <p className="text-[11px] font-bold text-slate-400 mt-2 tracking-wider">SIPRADI COMPANIES NEPAL</p>
-            </div>
+        {/* Ad Placeholder — reserved advertising slot */}
+        <div className="w-full min-h-[136px] md:min-h-[152px] bg-slate-50/60 border-2 border-dashed border-slate-200 rounded-2xl p-6 md:p-8 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 text-center sm:text-left">
+          <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+            </svg>
           </div>
-
-          <div className="flex-shrink-0 bg-white/60 backdrop-blur-md px-6 py-4 rounded-2xl border border-yellow-300/40 shadow-sm text-center w-full md:w-auto">
-            <span className="text-xs font-bold text-slate-500 block uppercase">EMI starts at</span>
-            <span className="text-2xl font-black text-amber-600 block mt-0.5">Rs. 28,450/mo</span>
-            <button 
-              onClick={() => {
-                const tiago = getVehicles().find(v => v.model.includes("Tiago")) || VEHICLES[8];
-                setSelectedEmiVehicle(tiago);
-              }}
-              className="bg-slate-900 text-white font-bold text-xs px-5 py-2.5 rounded-xl hover:bg-slate-800 transition-colors mt-3 w-full"
-            >
-              Calculate Offer
-            </button>
+          <div>
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Advertisement</span>
+            <h3 className="text-lg md:text-xl font-black text-slate-700 tracking-tight mt-0.5">Ad space available</h3>
+            <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-1">
+              Feature your dealership or EV offer here. <span className="text-blue-600 font-bold">Get in touch to advertise.</span>
+            </p>
           </div>
         </div>
 
         {/* Filters and List Core Grid */}
         <div className="flex flex-col lg:flex-row gap-8 items-start">
-          
+
           {/* A. Left Sidebar Filters */}
-          <aside className="w-full lg:w-72 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col gap-6 sticky top-20">
+          <aside className="w-full lg:w-72 lg:flex-shrink-0 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col gap-6 lg:sticky lg:top-20">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-extrabold text-slate-900 text-base">Search Filters</h3>
               <button 
@@ -393,13 +436,13 @@ export default function EVNepalHome() {
           </aside>
 
           {/* B. Right Main Listings Area */}
-          <div className="flex-1 w-full flex flex-col gap-6">
+          <div className="flex-1 w-full min-w-0 flex flex-col gap-6">
             
             {/* Top Sort / View Pill Bar */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white border border-slate-200/60 p-3 rounded-2xl shadow-sm">
               
               {/* Category Pills (Budget options) */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none flex-grow">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none flex-grow min-w-0">
                 {[
                   { label: "All Budgets", value: undefined },
                   { label: "Under Rs. 20L", value: 2000000 },
@@ -417,6 +460,20 @@ export default function EVNepalHome() {
                   </button>
                 ))}
               </div>
+
+              {/* Active Fuel Filter Badge */}
+              {fuelFilter && (
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                  fuelFilter === 'ev'
+                    ? 'bg-blue-50 border-blue-200 text-blue-700'
+                    : fuelFilter === 'diesel'
+                    ? 'bg-amber-50 border-amber-200 text-amber-700'
+                    : 'bg-orange-50 border-orange-200 text-orange-700'
+                }`}>
+                  <span>{fuelFilter === 'ev' ? '⚡ EV Only' : fuelFilter === 'diesel' ? '🛢️ Diesel Only' : '⛽ Petrol Only'}</span>
+                  <Link href="/" className="ml-1 hover:opacity-70 transition-opacity" title="Clear filter">✕</Link>
+                </div>
+              )}
 
               {/* Controls (Sort + View toggles) */}
               <div className="flex items-center justify-between gap-3 sm:justify-end">
@@ -793,3 +850,12 @@ export default function EVNepalHome() {
     </div>
   );
 }
+
+export default function EVNepalHome() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-400 text-lg">Loading...</div>}>
+      <HomeContent />
+    </Suspense>
+  );
+}
+

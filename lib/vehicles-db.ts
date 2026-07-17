@@ -795,6 +795,8 @@ export function getVehicles(params: FilterParams & { showDiscountedOnly?: boolea
       list = list.filter(v => v.fuel === 'Electric');
     } else if (fuel === 'petrol') {
       list = list.filter(v => v.fuel === 'Petrol');
+    } else if (fuel === 'diesel') {
+      list = list.filter(v => v.fuel === 'Diesel');
     }
   }
 

@@ -3,6 +3,7 @@ import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import React from "react";
+import { UserMenu } from "@/components/auth/UserMenu";
 
 // Simple custom SVG components for spec highlights
 const CheckIcon = () => (
@@ -39,9 +40,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             <span>SaaS Nepal</span>
           </Link>
           <div className="flex items-center gap-4 text-sm font-semibold text-slate-600">
-            <Link href="/" className="hover:text-blue-600 transition-colors">Find an EV</Link>
-            <Link href="/#used-marketplace" className="hover:text-blue-600 transition-colors">Used EVs</Link>
-            <Link href="/" className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs transition-all">Sign In</Link>
+            <Link href="/" className="hover:text-blue-600 transition-colors">Find cars</Link>
+            <Link href="/#used-marketplace" className="hover:text-blue-600 transition-colors">Used car</Link>
+            <UserMenu signInClassName="bg-slate-900 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-xs transition-all" />
           </div>
         </div>
       </header>

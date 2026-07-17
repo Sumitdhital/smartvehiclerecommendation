@@ -1,0 +1,29 @@
+{
+    // Debug configurations for Next.js application
+    // - "Next: Dev (Launch Chrome)" launches the browser and runs `npm run dev` before opening
+    // - "Next: Dev (Run and Attach Node)" starts the Next dev server and attaches the Node debugger
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Next: Dev (Launch Chrome)",
+            "type": "pwa-chrome",
+            "request": "launch",
+            "url": "http://localhost:3000",
+            "webRoot": "${workspaceFolder}",
+            "preLaunchTask": "npm: dev",
+            "userDataDir": "${workspaceFolder}/.vscode/chrome"
+        },
+        {
+            "name": "Next: Dev (Run and Attach Node)",
+            "type": "pwa-node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "dev"],
+            "console": "integratedTerminal",
+            "autoAttachChildProcesses": true,
+            "env": {
+                "NODE_OPTIONS": "--inspect=9229"
+            }
+        }
+    ]
+}

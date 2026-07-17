@@ -6,6 +6,7 @@ import { getVehicles, getVehicleById, getPopularComparisons, getAllComparisons, 
 import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { UserMenu } from "@/components/auth/UserMenu";
 
 // Custom icons
 const CloseIcon = () => (
@@ -26,6 +27,240 @@ const BackIcon = () => (
   </svg>
 );
 
+const SearchIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-slate-400 shrink-0">
+    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+
+// Deterministic soft tint per brand so placeholder cards stay distinguishable but cohesive.
+function brandHue(brand: string) {
+  let h = 0;
+  for (let i = 0; i < brand.length; i++) h = (h * 31 + brand.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+
+// Vehicle image with a branded fallback (real photos live in /images but may be absent).
+function VehicleThumb({ vehicle, className = "" }: { vehicle: ExtendedVehicle; className?: string }) {
+  const src = vehicle.images?.[0];
+  const [failed, setFailed] = useState(false);
+  const hue = brandHue(vehicle.brand);
+  const showImg = Boolean(src) && !failed;
+
+  return (
+    <div
+      className={`relative flex items-center justify-center overflow-hidden ${className}`}
+      style={showImg ? undefined : { background: `linear-gradient(135deg, hsl(${hue} 45% 96%), hsl(${(hue + 38) % 360} 48% 89%))` }}
+    >
+      {showImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={`${vehicle.brand} ${vehicle.model}`}
+          onError={() => setFailed(true)}
+          className="h-full w-full object-contain"
+        />
+      ) : (
+        <>
+          <span
+            className="absolute bottom-[18%] h-1/4 w-2/3 rounded-full blur-md"
+            style={{ background: `hsl(${hue} 55% 70% / 0.4)` }}
+          />
+          <span
+            className="relative font-black uppercase tracking-widest leading-none"
+            style={{ color: `hsl(${hue} 34% 44%)`, opacity: 0.6 }}
+          >
+            {vehicle.brand}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// A single selectable vehicle card used inside the picker grid.
+function VehiclePickCard({
+  vehicle,
+  selected,
+  onClick,
+}: {
+  vehicle: ExtendedVehicle;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={selected}
+      aria-pressed={selected}
+      className={`group text-left rounded-2xl border overflow-hidden transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 ${
+        selected
+          ? "border-blue-300 bg-blue-50/50 cursor-default ring-1 ring-blue-200"
+          : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-md hover:-translate-y-0.5"
+      }`}
+    >
+      <div className="relative">
+        <VehicleThumb vehicle={vehicle} className="h-28 w-full text-xl" />
+        <span className="absolute top-2 left-2 bg-white/85 backdrop-blur-sm text-[9px] font-black uppercase tracking-wider text-slate-600 px-2 py-0.5 rounded-full">
+          {vehicle.fuel === "Electric" ? "EV" : vehicle.fuel} · {vehicle.type}
+        </span>
+        {selected && (
+          <span className="absolute top-2 right-2 bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+            <CheckIcon /> In compare
+          </span>
+        )}
+      </div>
+      <div className="p-3">
+        <span className="text-[10px] font-black uppercase text-blue-600 tracking-wider">{vehicle.brand}</span>
+        <h4 className="font-extrabold text-slate-900 text-sm leading-snug truncate">{vehicle.model}</h4>
+        <p className="text-[11px] font-bold text-slate-400 truncate">{vehicle.variant}</p>
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-xs font-black text-slate-900">Rs. {(vehicle.price / 100000).toFixed(1)}L</span>
+          <span className="text-[10px] font-bold text-slate-400">{vehicle.rangeKm ? `${vehicle.rangeKm} km` : ""}</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// Full-screen card picker that replaces the old name-only dropdown / select.
+function VehiclePickerModal({
+  slotIndex,
+  vehicles,
+  selectedIds,
+  search,
+  setSearch,
+  fuel,
+  setFuel,
+  onSelect,
+  onClose,
+}: {
+  slotIndex: number;
+  vehicles: ExtendedVehicle[];
+  selectedIds: string[];
+  search: string;
+  setSearch: (v: string) => void;
+  fuel: "all" | "ev" | "petrol";
+  setFuel: (v: "all" | "ev" | "petrol") => void;
+  onSelect: (index: number, id: string) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  const currentId = selectedIds[slotIndex];
+  const q = search.trim().toLowerCase();
+  const filtered = vehicles.filter((v) => {
+    const matchesText = q === "" || `${v.brand} ${v.model} ${v.variant}`.toLowerCase().includes(q);
+    const matchesFuel =
+      fuel === "all" || (fuel === "ev" && v.fuel === "Electric") || (fuel === "petrol" && v.fuel === "Petrol");
+    return matchesText && matchesFuel;
+  });
+
+  const fuelTabs: { key: "all" | "ev" | "petrol"; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "ev", label: "Electric" },
+    { key: "petrol", label: "Petrol" },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm sm:p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Select vehicle for slot ${slotIndex + 1}`}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white w-full sm:max-w-3xl rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+      >
+        {/* Header */}
+        <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <span className="text-[10px] font-black uppercase text-blue-600 tracking-wider">Slot {slotIndex + 1}</span>
+              <h2 className="text-lg font-black text-slate-900 tracking-tight leading-tight">Pick a car to compare</h2>
+              <p className="text-xs text-slate-400 font-semibold mt-0.5">Tap a card to add it to this slot</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-700 hover:bg-slate-50 w-9 h-9 rounded-full border border-slate-100 flex items-center justify-center transition-all shrink-0"
+              aria-label="Close"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-grow focus-within:border-blue-400 focus-within:bg-white transition-colors">
+              <SearchIcon />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by brand, model or variant"
+                className="w-full text-sm font-semibold bg-transparent border-none focus:outline-none placeholder:text-slate-400 placeholder:font-medium"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center bg-slate-100 rounded-xl p-1 shrink-0">
+              {fuelTabs.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setFuel(t.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    fuel === t.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Grid */}
+        <div className="overflow-y-auto p-5 sm:p-6">
+          {filtered.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="font-extrabold text-slate-700 text-sm">No cars match your search</p>
+              <p className="text-xs text-slate-400 font-semibold mt-1">Try a different name or clear the filter.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+              {filtered.map((v) => (
+                <VehiclePickCard
+                  key={v.id}
+                  vehicle={v}
+                  selected={selectedIds.includes(v.id) && v.id !== currentId}
+                  onClick={() => onSelect(slotIndex, v.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // We wrap the main Compare page in a Suspense boundary because next.js app router uses searchParams which requires suspense client side.
 function ComparePageContent() {
   const router = useRouter();
@@ -36,9 +271,10 @@ function ComparePageContent() {
   const [activeTab, setActiveTab] = useState<"hub" | "details">("hub");
   const [allVehiclesList, setAllVehiclesList] = useState<ExtendedVehicle[]>([]);
 
-  // Search dropdown states for manual selection boxes
+  // Card picker states (slot the picker is open for + its search / fuel filter)
   const [activeDropdownIndex, setActiveDropdownIndex] = useState<number | null>(null);
   const [dropdownSearch, setDropdownSearch] = useState("");
+  const [pickerFuel, setPickerFuel] = useState<"all" | "ev" | "petrol">("all");
 
   // Pagination states for all comparisons
   const [allComparisonsPage, setAllComparisonsPage] = useState(1);
@@ -101,18 +337,6 @@ function ComparePageContent() {
     setActiveDropdownIndex(null);
     setDropdownSearch("");
     handleUpdateUrl(cleanIds);
-  };
-
-  const handleSwapVehicle = (index: number, newId: string) => {
-    const nextIds = [...selectedIds];
-    nextIds[index] = newId;
-    setSelectedIds(nextIds);
-    
-    const vehicleObj = getVehicleById(newId);
-    if (vehicleObj) {
-      addToCompare(vehicleObj);
-    }
-    handleUpdateUrl(nextIds);
   };
 
   const handlePopularCompareTrigger = (name1: string, name2: string) => {
@@ -186,9 +410,9 @@ function ComparePageContent() {
             <span>SaaS Nepal</span>
           </Link>
           <div className="flex items-center gap-4 text-sm font-semibold text-slate-600">
-            <Link href="/" className="hover:text-blue-600 transition-colors">Find an EV</Link>
-            <Link href="/#used-marketplace" className="hover:text-blue-600 transition-colors">Used EVs</Link>
-            <Link href="/" className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs transition-all">Sign In</Link>
+            <Link href="/" className="hover:text-blue-600 transition-colors">Find cars</Link>
+            <Link href="/#used-marketplace" className="hover:text-blue-600 transition-colors">Used car</Link>
+            <UserMenu signInClassName="bg-slate-900 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-xs transition-all" />
           </div>
         </div>
       </header>
@@ -210,7 +434,6 @@ function ComparePageContent() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[0, 1, 2].map((slotIndex) => {
                 const vehicle = comparedVehiclesList[slotIndex];
-                const isDropdownOpen = activeDropdownIndex === slotIndex;
 
                 return (
                   <div 
@@ -218,85 +441,59 @@ function ComparePageContent() {
                     className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-6 flex flex-col items-center justify-center min-h-64 relative shadow-sm hover:border-slate-300 transition-colors"
                   >
                     {vehicle ? (
-                      /* Slot with Vehicle */
-                      <div className="w-full flex flex-col items-center text-center gap-4">
-                        <button 
+                      /* Slot with Vehicle — image card */
+                      <div className="w-full flex flex-col gap-4">
+                        <button
                           onClick={() => handleRemoveVehicle(vehicle.id)}
-                          className="absolute top-4 right-4 text-slate-400 hover:text-red-500 hover:bg-slate-50 p-1.5 rounded-full border border-slate-100 transition-all"
+                          className="absolute top-4 right-4 z-10 text-slate-400 hover:text-red-500 bg-white/80 backdrop-blur-sm hover:bg-white p-1.5 rounded-full border border-slate-100 transition-all"
                           title="Remove"
                           id={`remove-slot-${slotIndex}`}
                         >
                           <CloseIcon />
                         </button>
-                        
-                        <span className="text-[10px] font-black uppercase text-blue-600 tracking-wider">Slot {slotIndex + 1} Selected</span>
-                        <div className="w-16 h-10 bg-blue-500/5 border border-blue-100 rounded-full flex items-center justify-center text-xs font-black text-blue-600/30 uppercase mt-2">
-                          {vehicle.brand}
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-blue-600 tracking-wider">Slot {slotIndex + 1}</span>
                         </div>
-                        <div>
-                          <h4 className="font-extrabold text-slate-900 text-base">{vehicle.brand} {vehicle.model}</h4>
+
+                        <VehicleThumb vehicle={vehicle} className="h-32 w-full rounded-2xl border border-slate-100 text-2xl" />
+
+                        <div className="text-center">
+                          <h4 className="font-extrabold text-slate-900 text-base leading-snug">{vehicle.brand} {vehicle.model}</h4>
                           <p className="text-xs text-slate-400 font-semibold mt-0.5">{vehicle.variant}</p>
+                          <p className="text-sm font-black text-slate-900 mt-2">Rs. {vehicle.price.toLocaleString("en-NP")}</p>
                         </div>
-                        <p className="text-sm font-black text-slate-900">Rs. {vehicle.price.toLocaleString("en-NP")}</p>
+
+                        <button
+                          onClick={() => {
+                            setActiveDropdownIndex(slotIndex);
+                            setDropdownSearch("");
+                          }}
+                          className="w-full text-center bg-white border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600 font-bold text-xs py-2.5 rounded-xl transition-all"
+                          id={`change-slot-${slotIndex}`}
+                        >
+                          Change car
+                        </button>
                       </div>
                     ) : (
-                      /* Slot Empty: Search Box trigger */
-                      <div className="w-full flex flex-col items-center text-center gap-4">
+                      /* Slot Empty — opens the card picker */
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveDropdownIndex(slotIndex);
+                          setDropdownSearch("");
+                        }}
+                        className="w-full flex flex-col items-center text-center gap-4 py-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-2xl"
+                        id={`select-btn-${slotIndex}`}
+                      >
                         <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shadow-sm">
                           <PlusIcon />
                         </div>
                         <span className="text-sm font-extrabold text-slate-600">Select Vehicle {slotIndex + 1}</span>
-                        
-                        {!isDropdownOpen ? (
-                          <button
-                            onClick={() => {
-                              setActiveDropdownIndex(slotIndex);
-                              setDropdownSearch("");
-                            }}
-                            className="bg-blue-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors mt-2"
-                            id={`select-btn-${slotIndex}`}
-                          >
-                            Choose EV
-                          </button>
-                        ) : (
-                          /* Dropdown overlay container */
-                          <div className="w-full flex flex-col gap-2 z-10 bg-white border border-slate-200 rounded-2xl p-3 shadow-lg absolute inset-x-2 top-4 bottom-4">
-                            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1">
-                              <input 
-                                type="text"
-                                value={dropdownSearch}
-                                onChange={(e) => setDropdownSearch(e.target.value)}
-                                placeholder="Search EV..."
-                                className="w-full text-xs font-bold bg-transparent border-none focus:outline-none py-1"
-                                autoFocus
-                              />
-                              <button 
-                                onClick={() => setActiveDropdownIndex(null)}
-                                className="text-slate-400 hover:text-slate-600 text-xs"
-                              >
-                                &times;
-                              </button>
-                            </div>
-                            
-                            <div className="overflow-y-auto flex-1 flex flex-col text-left gap-1 pr-1">
-                              {allVehiclesList
-                                .filter(v => `${v.brand} ${v.model}`.toLowerCase().includes(dropdownSearch.toLowerCase()))
-                                .map(v => (
-                                  <button
-                                    key={v.id}
-                                    onClick={() => handleSelectSlotVehicle(slotIndex, v.id)}
-                                    className="text-xs font-semibold hover:bg-slate-50 p-2 rounded-lg text-slate-700 flex justify-between items-center transition-colors"
-                                    id={`select-option-${v.id}`}
-                                  >
-                                    <span>{v.brand} {v.model}</span>
-                                    <span className="text-slate-400 font-mono text-[10px]">Rs. {(v.price/100000).toFixed(1)}L</span>
-                                  </button>
-                                ))
-                              }
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        <span className="bg-blue-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl group-hover:bg-blue-700 transition-colors">
+                          Browse cars
+                        </span>
+                      </button>
                     )}
                   </div>
                 );
@@ -471,23 +668,9 @@ function ComparePageContent() {
                         <CloseIcon />
                       </button>
 
-                      {/* Dropdown swap selector */}
-                      <div className="w-32">
-                        <select
-                          value={vehicle.id}
-                          onChange={(e) => handleSwapVehicle(index, e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-500 appearance-none pr-6 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.25rem center', backgroundSize: '0.85rem', backgroundRepeat: 'no-repeat' }}
-                        >
-                          {allVehiclesList.map(v => (
-                            <option key={v.id} value={v.id}>{v.brand} {v.model}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Photo box */}
-                      <div className="h-24 w-full rounded-xl bg-white border border-slate-100 flex items-center justify-center overflow-hidden relative shadow-sm">
-                        <span className="text-2xl font-extrabold text-blue-500/20 uppercase tracking-wider">{vehicle.brand}</span>
+                      {/* Photo box (real image with branded fallback) */}
+                      <div className="h-24 w-full rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                        <VehicleThumb vehicle={vehicle} className="h-full w-full text-xl" />
                       </div>
 
                       {/* Meta titles */}
@@ -496,6 +679,18 @@ function ComparePageContent() {
                         <h3 className="font-extrabold text-slate-900 text-sm mt-0.5 leading-snug">{vehicle.model}</h3>
                         <p className="text-[11px] font-bold text-slate-400 mt-0.5">{vehicle.variant}</p>
                       </div>
+
+                      {/* Card-based swap trigger */}
+                      <button
+                        onClick={() => {
+                          setActiveDropdownIndex(index);
+                          setDropdownSearch("");
+                        }}
+                        className="w-full text-center bg-white border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600 font-bold text-[11px] py-2 rounded-lg transition-all"
+                        id={`swap-slot-${index}`}
+                      >
+                        Change car
+                      </button>
                     </div>
                   ))}
                   
@@ -509,9 +704,8 @@ function ComparePageContent() {
                           onClick={() => {
                             setActiveDropdownIndex(slotIdx);
                             setDropdownSearch("");
-                            setActiveTab("hub");
                           }}
-                          className="border border-slate-200 text-slate-500 hover:bg-slate-50 font-bold text-[10px] px-3.5 py-1.5 rounded-lg transition-colors"
+                          className="border border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-600 font-bold text-[10px] px-3.5 py-1.5 rounded-lg transition-colors"
                         >
                           Add Car
                         </button>
@@ -602,6 +796,24 @@ function ComparePageContent() {
           </div>
         )}
       </main>
+
+      {/* Card-based vehicle picker */}
+      {activeDropdownIndex !== null && (
+        <VehiclePickerModal
+          slotIndex={activeDropdownIndex}
+          vehicles={allVehiclesList}
+          selectedIds={selectedIds}
+          search={dropdownSearch}
+          setSearch={setDropdownSearch}
+          fuel={pickerFuel}
+          setFuel={setPickerFuel}
+          onSelect={handleSelectSlotVehicle}
+          onClose={() => {
+            setActiveDropdownIndex(null);
+            setDropdownSearch("");
+          }}
+        />
+      )}
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-100 py-10 mt-12 w-full text-center flex flex-col gap-6">

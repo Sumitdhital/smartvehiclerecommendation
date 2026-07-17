@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ExtendedVehicle } from "@/lib/vehicles-db";
 import type { TaxBreakdown } from "@/lib/tax-engine";
 import { BookTestDriveModal } from "@/components/vehicle/BookTestDriveModal";
+import { recordView } from "@/lib/search-history";
 
 /* ─────────────────────────── helpers ─────────────────────────── */
 
@@ -315,6 +316,13 @@ export default function VehicleDetail({
   similar: ExtendedVehicle[];
 }) {
   const v = vehicle;
+
+  // Log a "viewed" entry for signed-in users (no-ops when logged out; admins
+  // are logged server-side in app/vehicle/[id]/page.tsx instead).
+  useEffect(() => {
+    recordView(v.id, `${v.brand} ${v.model} ${v.variant}`);
+  }, [v.id, v.brand, v.model, v.variant]);
+
   const isEV = v.fuel === "Electric";
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showTestDrive, setShowTestDrive] = useState(false);

@@ -122,8 +122,81 @@ NotificationsProvider  ──useNotifications()──▶ NotificationBell (badge
   arrives live via realtime and the bell badge increments.
 - Avatar menu shows only Search History and Log out.
 
+## Part 2 — Admin notification bar
+
+The admin panel (`/admin`) uses a **separate** auth system: a custom cookie via
+`getAdminSession` (see `lib/admin-auth.ts`), not Supabase auth. Admins have no
+Supabase `user_id`, so the user bell above cannot be reused — admins need their
+own data source and their own read path (cookie-authed API route, not RLS).
+
+### Data source: `admin_notifications` table (new)
+
+A new table plus Postgres triggers, independent of the per-user `notifications`
+table.
+
+```
+admin_notifications (
+  id          uuid pk default gen_random_uuid(),
+  type        text not null,      -- 'used_listing' | 'test_drive'
+  title       text not null,
+  body        text,
+  read        boolean not null default false,
+  created_at  timestamptz not null default now()
+)
+```
+
+- RLS: enabled, with **no** public policies — the table is unreachable by the
+  anon/authenticated clients. Only the service role (used by the admin API
+  routes) reads/writes it. Triggers run as definer so inserts succeed regardless.
+- Triggers (events chosen):
+  - **New used listing** — `AFTER INSERT ON used_listings` inserts a row
+    (`type='used_listing'`, title like "New listing: <make> <model>").
+  - **New test-drive booking** — `AFTER INSERT ON test_drive_bookings` inserts a
+    row (`type='test_drive'`). This is in addition to the existing per-owner
+    notification the booking already fires.
+- New-user-signup notifications are out of scope for now (would require a trigger
+  on `auth.users`); easy to add later as another trigger + type.
+
+### Read path: `/api/admin/notifications` (new route)
+
+Cookie-authed like the other `/api/admin/*` routes:
+
+- `GET` — verifies `getAdminSession()`; returns the latest N admin notifications
+  and the unread count. Uses the service-role Supabase client already used by
+  admin data routes (see `lib/admin-data.ts` / existing admin API routes).
+- `POST` (mark read) — verifies session, sets `read = true` on all unread rows.
+- 401 when there's no admin session.
+
+No realtime for admins (the anon realtime channel is RLS-gated and admins aren't
+Supabase users). The bar fetches on mount and re-fetches when opened; a light
+poll (e.g. every 60s) keeps the badge fresh. Polling interval is a detail for the
+plan.
+
+### UI: admin bell in `AdminChrome`
+
+A bell/notification control in the admin sidebar, next to the **"Signed in as
+{adminName}"** block. Own dropdown listing recent admin notifications with the
+same visual language as the user bell (unread dot, `timeAgo`, empty state),
+badge with unread count. Opening marks all read via the POST route. This is a
+distinct component from `NotificationBell` because the data path differs (fetch
+API + poll, no context/realtime), though it can share small presentational
+helpers (`timeAgo`, badge, list row) factored into a shared module.
+
+### Admin data flow
+
+```
+used_listings INSERT ─┐
+                      ├─trigger─▶ admin_notifications (service-role only)
+test_drive_bookings ──┘                    │
+                                           ▼
+   AdminChrome bell ◀── GET /api/admin/notifications (cookie auth + poll)
+                    ──▶ POST /api/admin/notifications (mark read)
+```
+
 ## Out of scope
 
-- No change to the notifications data layer, DB schema, or trigger.
-- No new notification types.
-- No standalone `/notifications` page (the dropdown is sufficient).
+- No change to the existing per-user `notifications` data layer, schema, or
+  trigger (the admin table is separate and additive).
+- No new-user-signup admin notification (future add).
+- No standalone `/notifications` page (dropdowns are sufficient).
+- No realtime for the admin bar (poll-based).

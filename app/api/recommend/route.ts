@@ -29,7 +29,8 @@ export async function POST(request: Request) {
       // Calculate taxes on road
       const taxInfo = calculateNepalOnRoadPrice({
         category: vehicle.isEV ? 'EV' : 'ICE_' + vehicle.type,
-        engineCc: vehicle.batteryKwh || 0,
+        // EV brackets key off battery kWh; ICE brackets key off engine CC.
+        engineCc: vehicle.isEV ? (vehicle.batteryKwh || 0) : (vehicle.engineCc || 0),
         basePriceNPR: vehicle.price
       });
 

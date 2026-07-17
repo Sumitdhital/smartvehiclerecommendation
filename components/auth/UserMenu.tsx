@@ -5,6 +5,25 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import {
+  fetchNotifications,
+  markAllRead,
+  subscribeToNotifications,
+  type AppNotification,
+} from "@/lib/notifications";
+
+// Compact "3m ago" / "2h ago" / "Jul 12" relative timestamp.
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 const DEFAULT_SIGNIN =
   "border border-slate-200 text-slate-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 font-bold px-5 py-2 rounded-xl text-sm transition-all duration-200";
@@ -23,7 +42,10 @@ export function UserMenu({ signInClassName }: { signInClassName?: string }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const ref = useRef<HTMLDivElement>(null);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   // Load the current session and stay in sync with sign-in / sign-out.
   useEffect(() => {
@@ -36,6 +58,31 @@ export function UserMenu({ signInClassName }: { signInClassName?: string }) {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Load notifications for the signed-in user and stay live via realtime.
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+    fetchNotifications().then(setNotifications);
+    const unsubscribe = subscribeToNotifications(user.id, (n) =>
+      setNotifications((prev) => [n, ...prev].slice(0, 8))
+    );
+    return unsubscribe;
+  }, [user]);
+
+  // Opening the menu clears the unread badge.
+  const handleOpen = () => {
+    setOpen((o) => {
+      const next = !o;
+      if (next && unreadCount > 0) {
+        markAllRead();
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      }
+      return next;
+    });
+  };
 
   // Close the dropdown on outside click or Escape.
   useEffect(() => {
@@ -81,15 +128,20 @@ export function UserMenu({ signInClassName }: { signInClassName?: string }) {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleOpen}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Account menu"
-        className="flex items-center gap-1.5 rounded-full outline-none transition-all focus-visible:ring-2 focus-visible:ring-blue-500/40"
+        aria-label={unreadCount > 0 ? `Account menu, ${unreadCount} new notifications` : "Account menu"}
+        className="relative flex items-center gap-1.5 rounded-full outline-none transition-all focus-visible:ring-2 focus-visible:ring-blue-500/40"
       >
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-sm font-black text-white shadow-md shadow-blue-600/25 ring-2 ring-white">
           {initials}
         </span>
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white ring-2 ring-white">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
         <svg
           className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
@@ -117,7 +169,59 @@ export function UserMenu({ signInClassName }: { signInClassName?: string }) {
             </div>
           </div>
 
+          {/* Notifications */}
+          <div className="border-b border-slate-100">
+            <p className="px-4 pb-1.5 pt-3 text-[11px] font-black uppercase tracking-wide text-slate-400">
+              Notifications
+            </p>
+            {notifications.length === 0 ? (
+              <p className="px-4 pb-3 text-sm font-medium text-slate-400">You're all caught up.</p>
+            ) : (
+              <ul className="max-h-64 overflow-y-auto pb-1.5">
+                {notifications.map((n) => (
+                  <li
+                    key={n.id}
+                    className={`px-4 py-2.5 ${n.read ? "" : "bg-blue-50/60"}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span
+                        className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+                          n.read ? "bg-transparent" : "bg-blue-500"
+                        }`}
+                        aria-hidden
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800">{n.title}</p>
+                        {n.body && (
+                          <p className="mt-0.5 text-xs font-medium leading-snug text-slate-500">{n.body}</p>
+                        )}
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                          {timeAgo(n.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div className="py-1.5">
+            <Link
+              href="/history"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-bold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-600"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                />
+              </svg>
+              Search History
+            </Link>
             <button
               onClick={handleLogout}
               role="menuitem"

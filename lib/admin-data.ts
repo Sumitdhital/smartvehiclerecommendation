@@ -23,6 +23,12 @@ export const USED_COLUMNS = [
 
 export const USED_REQUIRED = ["vehicle_brand", "vehicle_model", "asking_price"];
 
+// Rental listings are `used_listings` rows with listing_type = 'rent'. They share
+// the used-listings column shape; listing_type is forced to 'rent' server-side so
+// the rentals admin surface can reuse the same writable-column whitelist.
+export const RENTAL_COLUMNS = USED_COLUMNS;
+export const RENTAL_REQUIRED = USED_REQUIRED;
+
 export const ADMIN_COLUMNS = ["name", "email", "password"] as const;
 export const ADMIN_REQUIRED = ["name", "email", "password"];
 

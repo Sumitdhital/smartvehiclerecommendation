@@ -4,7 +4,7 @@ import React from "react";
 import ResourceManager, { ColumnDef, FieldDef } from "@/components/admin/ResourceManager";
 import SendFeedbackButton from "@/components/admin/SendFeedbackButton";
 
-interface UsedRow {
+interface RentalRow {
   id: string;
   vehicle_brand: string;
   vehicle_model: string;
@@ -18,7 +18,7 @@ interface UsedRow {
   [key: string]: unknown;
 }
 
-const columns: ColumnDef<UsedRow>[] = [
+const columns: ColumnDef<RentalRow>[] = [
   {
     key: "vehicle_brand",
     label: "Vehicle",
@@ -30,16 +30,11 @@ const columns: ColumnDef<UsedRow>[] = [
     ),
   },
   { key: "year", label: "Year" },
-  {
-    key: "km_driven",
-    label: "Km driven",
-    render: (row) => (row.km_driven === null ? "—" : `${Number(row.km_driven).toLocaleString("en-IN")} km`),
-  },
   { key: "condition", label: "Condition" },
   {
     key: "asking_price",
-    label: "Price",
-    render: (row) => `रू ${Number(row.asking_price).toLocaleString("en-IN")}`,
+    label: "Rate",
+    render: (row) => `रू ${Number(row.asking_price).toLocaleString("en-IN")} /day`,
   },
   { key: "location", label: "Location" },
   {
@@ -47,7 +42,7 @@ const columns: ColumnDef<UsedRow>[] = [
     label: "Status",
     render: (row) =>
       row.sold ? (
-        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-black text-slate-600">Sold</span>
+        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-black text-slate-600">Rented out</span>
       ) : (
         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-700">Available</span>
       ),
@@ -66,30 +61,30 @@ const fields: FieldDef[] = [
   { name: "color", label: "Color", placeholder: "White" },
   { name: "is_ev", label: "Electric vehicle", type: "checkbox" },
   { name: "battery_health", label: "Battery health (%)", type: "number", help: "EVs only" },
-  { name: "asking_price", label: "Price (NPR)", type: "number", required: true, placeholder: "3200000", help: "Asking price" },
-  { name: "original_price", label: "Original price (NPR)", type: "number" },
+  { name: "asking_price", label: "Rate per day (NPR)", type: "number", required: true, placeholder: "3500", help: "Per-day rental rate" },
+  { name: "original_price", label: "Vehicle value (NPR)", type: "number" },
   { name: "location", label: "Location", placeholder: "Kathmandu" },
-  { name: "seller_name", label: "Seller name", placeholder: "Ram Sharma" },
-  { name: "seller_type", label: "Seller type", type: "select", options: ["Individual", "Dealer"] },
+  { name: "seller_name", label: "Owner name", placeholder: "Ram Sharma" },
+  { name: "seller_type", label: "Owner type", type: "select", options: ["Individual", "Dealer"] },
   { name: "images", label: "Photo URLs", type: "tags", colSpan: 2, placeholder: "https://…/front.jpg, https://…/side.jpg", help: "Comma-separated URLs — the first is used as the card image" },
   { name: "features", label: "Features", type: "tags", colSpan: 2, placeholder: "Sunroof, Alloy wheels", help: "Comma-separated" },
-  { name: "sold", label: "Sold (hides “Book Test Drive”)", type: "checkbox" },
+  { name: "sold", label: "Rented out (hides “Request rental”)", type: "checkbox" },
   { name: "description", label: "Description", type: "textarea" },
 ];
 
-export default function AdminUsedListingsPage() {
+export default function AdminRentalsPage() {
   return (
-    <ResourceManager<UsedRow>
-      title="Used listings"
-      subtitle="Second-hand cars for sale stored in the database. (Rentals live under Rentals.)"
-      endpoint="/api/admin/used-listings"
+    <ResourceManager<RentalRow>
+      title="Rentals"
+      subtitle="Rent-type listings from the rentals marketplace (used_listings, listing_type = rent)."
+      endpoint="/api/admin/rentals"
       columns={columns}
       fields={fields}
-      addLabel="Add listing"
-      itemNoun="listing"
+      addLabel="Add rental"
+      itemNoun="rental"
       extraRowActions={(row) => (
         <SendFeedbackButton
-          target="used_listing"
+          target="rental_listing"
           id={row.id}
           label={`${row.vehicle_brand} ${row.vehicle_model}${row.vehicle_variant ? ` ${row.vehicle_variant}` : ""}`}
         />

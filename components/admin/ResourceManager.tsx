@@ -31,6 +31,7 @@ interface Props<Row extends { id: string }> {
   addLabel?: string;
   itemNoun?: string; // e.g. "vehicle"
   onRowOpen?: (row: Row) => void; // fired when a row's edit modal opens
+  extraRowActions?: (row: Row) => React.ReactNode; // rendered before Edit/Delete
 }
 
 type Values = Record<string, unknown>;
@@ -78,6 +79,7 @@ export default function ResourceManager<Row extends { id: string }>({
   addLabel = "Add new",
   itemNoun = "item",
   onRowOpen,
+  extraRowActions,
 }: Props<Row>) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -237,6 +239,7 @@ export default function ResourceManager<Row extends { id: string }>({
                     ))}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
+                        {extraRowActions?.(row)}
                         <button
                           onClick={() => openEdit(row)}
                           className="text-xs font-bold text-slate-600 hover:text-blue-600 border border-slate-200 hover:border-blue-300 px-3 py-1.5 rounded-lg transition-all"

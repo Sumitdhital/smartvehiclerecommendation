@@ -265,6 +265,7 @@ function HomeContent() {
             <nav className="hidden lg:flex items-center gap-6 text-sm font-semibold text-slate-600">
               <Link href="/" className="text-blue-600 hover:text-blue-700 transition-colors">Find cars</Link>
               <Link href="/used" className="hover:text-blue-600 transition-colors">Used car</Link>
+              <Link href="/rentals" className="hover:text-blue-600 transition-colors">Rentals</Link>
               {/* Cars dropdown */}
               <CarsDropdown activeFuel={fuelFilter} />
               <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare</Link>
@@ -311,6 +312,7 @@ function HomeContent() {
           <nav className="lg:hidden border-t border-slate-100 bg-white px-4 sm:px-6 py-4 flex flex-col gap-1 text-sm font-semibold text-slate-700 shadow-sm">
             <Link href="/" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Find cars</Link>
             <Link href="/used" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Used car</Link>
+            <Link href="/rentals" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Rentals</Link>
 
             {/* Cars — fuel type filters (same filter as the sidebar) */}
             <div className="mt-1 px-3 pt-2 pb-1 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Cars</div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useAppStore } from "@/lib/store";
-import { getVehicles, ExtendedVehicle } from "@/lib/vehicles-db";
+import { getVehiclesAsync, applyVehicleFilters, ExtendedVehicle } from "@/lib/vehicles-db";
 import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -185,8 +185,26 @@ function HomeContent() {
 
   const currentModels = brandFilter ? MODELS_BY_BRAND[brandFilter] || [] : [];
 
-  // Filter vehicles list dynamically
-  const filteredVehicles = getVehicles({
+  // Full catalog, loaded once from Supabase on mount.
+  const [allVehicles, setAllVehicles] = useState<ExtendedVehicle[]>([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    getVehiclesAsync()
+      .then((list) => {
+        if (active) setAllVehicles(list);
+      })
+      .finally(() => {
+        if (active) setLoadingVehicles(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Filter vehicles list dynamically (client-side, reusing the shared internals)
+  const filteredVehicles = applyVehicleFilters(allVehicles, {
     searchTerm,
     brand: brandFilter,
     model: modelFilter,
@@ -194,7 +212,7 @@ function HomeContent() {
     sortBy: sortBy as any,
     showDiscountedOnly: discountFilter,
     fuelFilter,
-  } as any);
+  });
 
   // Clear filters
   const handleClearFilters = () => {
@@ -529,7 +547,22 @@ function HomeContent() {
             </div>
 
             {/* Results Vehicle Grid */}
-            {filteredVehicles.length === 0 ? (
+            {loadingVehicles ? (
+              <div className={`grid gap-6 ${viewMode === "compact" ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"}`}>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className={cardStyles.card} aria-hidden="true">
+                    <div className="h-full w-full animate-pulse rounded-2xl border border-slate-200 bg-slate-100">
+                      <div className="h-40 w-full rounded-t-2xl bg-slate-200/70" />
+                      <div className="flex flex-col gap-2 p-4">
+                        <div className="h-4 w-2/3 rounded bg-slate-200" />
+                        <div className="h-3 w-1/2 rounded bg-slate-200/80" />
+                        <div className="mt-2 h-5 w-1/3 rounded bg-slate-200" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredVehicles.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
                 <p className="text-lg font-bold text-slate-700">No vehicles found matching filters</p>
                 <p className="text-sm text-slate-500 mt-2">Try adjusting your pricing limit or search keywords.</p>

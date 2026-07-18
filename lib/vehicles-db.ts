@@ -1,4 +1,13 @@
-import { Vehicle, UsedListing, FilterParams } from './types';
+import {
+  Vehicle,
+  UsedListing,
+  FilterParams,
+  VehicleCategory,
+  VehicleType,
+  FuelType,
+  TransmissionType,
+} from './types';
+import { supabase } from './supabase';
 
 // Let's create an extended interface for our app's mock data requirements
 export interface ExtendedVehicle extends Vehicle {
@@ -8,6 +17,8 @@ export interface ExtendedVehicle extends Vehicle {
   driveType?: string;
   totalAirbags?: number;
   torqueLabel?: string;
+  /** Supabase auth user that owns this row (dealer / individual). */
+  ownerId?: string;
 }
 
 export const VEHICLES: ExtendedVehicle[] = [
@@ -760,15 +771,27 @@ export const ALL_COMPARISONS = [
   { id: "comp-7", v1: "BYD Atto 2", price1: "Rs. 48,99,000", v2: "Tata Nexon EV", price2: "Rs. 40,99,000", ids: ["byd-atto2", "tata-nexon-ev"] }
 ];
 
-export function getVehicles(params: FilterParams & { showDiscountedOnly?: boolean; searchTerm?: string; model?: string } = {}) {
-  let list = [...VEHICLES];
+export type VehicleQuery = FilterParams & {
+  showDiscountedOnly?: boolean;
+  searchTerm?: string;
+  model?: string;
+  fuelFilter?: 'all' | 'ev' | 'petrol' | 'diesel' | string;
+};
+
+/**
+ * Shared filter + sort semantics for the catalog. Operates on whatever list of
+ * ExtendedVehicles it is handed (mock array or DB-mapped rows) so the sync and
+ * async entry points below stay behaviourally identical.
+ */
+export function applyVehicleFilters(source: ExtendedVehicle[], params: VehicleQuery = {}): ExtendedVehicle[] {
+  let list = [...source];
 
   // 1. Search term filter
   if (params.searchTerm) {
     const q = params.searchTerm.toLowerCase();
-    list = list.filter(v => 
-      v.brand.toLowerCase().includes(q) || 
-      v.model.toLowerCase().includes(q) || 
+    list = list.filter(v =>
+      v.brand.toLowerCase().includes(q) ||
+      v.model.toLowerCase().includes(q) ||
       (v.variant && v.variant.toLowerCase().includes(q))
     );
   }
@@ -788,9 +811,9 @@ export function getVehicles(params: FilterParams & { showDiscountedOnly?: boolea
     list = list.filter(v => v.price <= params.budgetMax!);
   }
 
-  // 5. Fuel type filter
-  if ((params as any).fuelFilter && (params as any).fuelFilter !== 'all') {
-    const fuel = (params as any).fuelFilter as string;
+  // 5. Fuel type filter — supports the ?fuel= URL convention (ev/petrol/diesel)
+  if (params.fuelFilter && params.fuelFilter !== 'all') {
+    const fuel = params.fuelFilter;
     if (fuel === 'ev') {
       list = list.filter(v => v.fuel === 'Electric');
     } else if (fuel === 'petrol') {
@@ -800,12 +823,42 @@ export function getVehicles(params: FilterParams & { showDiscountedOnly?: boolea
     }
   }
 
+  // 5b. Structured fuel filter (FilterParams.fuel) — exact FuelType match
+  if (params.fuel) {
+    list = list.filter(v => v.fuel === params.fuel);
+  }
+
+  // 5c. Vehicle type filter
+  if (params.type) {
+    list = list.filter(v => v.type === params.type);
+  }
+
+  // 5d. Seating filter
+  if (params.seatingMin) {
+    list = list.filter(v => v.seatingCapacity >= params.seatingMin!);
+  }
+
+  // 5e. Transmission filter
+  if (params.transmission) {
+    list = list.filter(v => v.transmission === params.transmission);
+  }
+
+  // 5f. Category filter
+  if (params.category && params.category !== 'all') {
+    list = list.filter(v => v.category === params.category);
+  }
+
+  // 5g. EV-only flag
+  if (params.isEV) {
+    list = list.filter(v => v.isEV);
+  }
+
   // 6. Discount filter
   if (params.showDiscountedOnly) {
     list = list.filter(v => v.hasDiscount);
   }
 
-  // 6. Sort
+  // 7. Sort
   if (params.sortBy) {
     if (params.sortBy === 'price-asc') {
       list.sort((a, b) => a.price - b.price);
@@ -813,6 +866,8 @@ export function getVehicles(params: FilterParams & { showDiscountedOnly?: boolea
       list.sort((a, b) => b.price - a.price);
     } else if (params.sortBy === 'range-desc') {
       list.sort((a, b) => (b.rangeKm || 0) - (a.rangeKm || 0));
+    } else if (params.sortBy === 'newest') {
+      list.sort((a, b) => (b.yearLaunched || 0) - (a.yearLaunched || 0));
     }
   } else {
     // Default sort by rating/popularity (e.g. descending rating then price)
@@ -822,6 +877,194 @@ export function getVehicles(params: FilterParams & { showDiscountedOnly?: boolea
   return list;
 }
 
+/* ───────────────────────── Supabase-backed catalog ─────────────────────────
+ * public.vehicles is the real source of truth (admins CRUD it, dealers insert
+ * rows). We read the whole table once, cache the promise at module scope, and
+ * map snake_case DB rows into the camelCase ExtendedVehicle the UI expects.
+ * Call refreshVehicles() after a write to bust the cache.
+ * -------------------------------------------------------------------------- */
+
+interface VehicleRow {
+  id: string;
+  brand: string;
+  model: string;
+  variant: string | null;
+  type: string | null;
+  fuel: string | null;
+  engine_cc: number | null;
+  horsepower: number | string | null;
+  torque: number | string | null;
+  mileage: number | string | null;
+  seating_capacity: number | null;
+  transmission: string | null;
+  ground_clearance: number | string | null;
+  price: number | string | null;
+  boot_space: number | string | null;
+  safety_rating: number | string | null;
+  key_features: unknown;
+  image_url: string | null;
+  slug: string | null;
+  brand_slug: string | null;
+  category: string | null;
+  battery_kwh: number | string | null;
+  range_km: number | string | null;
+  colors: unknown;
+  images: unknown;
+  is_ev: boolean | null;
+  is_featured: boolean | null;
+  year_launched: number | null;
+  description: string | null;
+  used_count: number | null;
+  dimensions: string | null;
+  drive_type: string | null;
+  total_airbags: number | null;
+  torque_label: string | null;
+  owner_id: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+function toNum(x: unknown): number | undefined {
+  if (x === null || x === undefined || x === '') return undefined;
+  const n = Number(x);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function toStrArray(x: unknown): string[] {
+  if (Array.isArray(x)) return x.filter((s): s is string => typeof s === 'string');
+  return [];
+}
+
+function slugify(s: string): string {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+/** Find the mock entry that best matches a DB row so we can borrow the fields
+ *  the DB doesn't store (topSpeed, acceleration, chargingTime) and backfill any
+ *  NULL columns. Matches brand+model+variant first, then brand+model. */
+function findMockMatch(brand: string, model: string, variant: string | null): ExtendedVehicle | undefined {
+  const b = (brand || '').toLowerCase().trim();
+  const m = (model || '').toLowerCase().trim();
+  const vr = (variant || '').toLowerCase().trim();
+  return (
+    VEHICLES.find(v => v.brand.toLowerCase() === b && v.model.toLowerCase() === m && (v.variant || '').toLowerCase() === vr) ||
+    VEHICLES.find(v => v.brand.toLowerCase() === b && v.model.toLowerCase() === m)
+  );
+}
+
+function mapVehicleRow(row: VehicleRow): ExtendedVehicle {
+  const mock = findMockMatch(row.brand, row.model, row.variant);
+
+  const dbImages = toStrArray(row.images);
+  const images =
+    dbImages.length > 0
+      ? dbImages
+      : row.image_url
+        ? [row.image_url]
+        : mock?.images ?? [];
+
+  const dbFeatures = toStrArray(row.key_features);
+  const dbColors = toStrArray(row.colors);
+
+  return {
+    id: row.id,
+    brand: row.brand,
+    brandSlug: row.brand_slug || mock?.brandSlug || slugify(row.brand),
+    model: row.model,
+    variant: row.variant ?? mock?.variant ?? '',
+    slug: row.slug || mock?.slug || slugify(`${row.brand}-${row.model}-${row.variant ?? ''}`),
+    category: ((row.category as VehicleCategory) || mock?.category || 'car'),
+    type: ((row.type as VehicleType) || mock?.type || 'SUV'),
+    fuel: ((row.fuel as FuelType) || mock?.fuel || 'Electric'),
+    engineCc: toNum(row.engine_cc) ?? mock?.engineCc,
+    batteryKwh: toNum(row.battery_kwh) ?? mock?.batteryKwh,
+    rangeKm: toNum(row.range_km) ?? mock?.rangeKm,
+    horsepower: toNum(row.horsepower) ?? mock?.horsepower ?? 0,
+    torque: toNum(row.torque) ?? mock?.torque ?? 0,
+    mileage: toNum(row.mileage) ?? mock?.mileage,
+    seatingCapacity: toNum(row.seating_capacity) ?? mock?.seatingCapacity ?? 5,
+    transmission: ((row.transmission as TransmissionType) || mock?.transmission || 'Automatic'),
+    groundClearance: toNum(row.ground_clearance) ?? mock?.groundClearance ?? 0,
+    price: toNum(row.price) ?? mock?.price ?? 0,
+    bootSpace: toNum(row.boot_space) ?? mock?.bootSpace,
+    safetyRating: toNum(row.safety_rating) ?? mock?.safetyRating,
+    keyFeatures: dbFeatures.length > 0 ? dbFeatures : mock?.keyFeatures ?? [],
+    images,
+    colors: dbColors.length > 0 ? dbColors : mock?.colors ?? [],
+    // DB has no column for these — fall back to the matched mock entry.
+    topSpeed: mock?.topSpeed,
+    acceleration: mock?.acceleration,
+    chargingTime: mock?.chargingTime,
+    isEV: row.is_ev ?? mock?.isEV ?? (row.fuel === 'Electric'),
+    isFeatured: row.is_featured ?? mock?.isFeatured ?? false,
+    yearLaunched: toNum(row.year_launched) ?? mock?.yearLaunched ?? new Date().getFullYear(),
+    description: row.description || mock?.description || '',
+    usedCount: row.used_count ?? mock?.usedCount,
+    dimensions: row.dimensions || mock?.dimensions,
+    driveType: row.drive_type || mock?.driveType,
+    totalAirbags: row.total_airbags ?? mock?.totalAirbags,
+    torqueLabel: row.torque_label || mock?.torqueLabel,
+    ownerId: row.owner_id ?? undefined,
+  };
+}
+
+let vehiclesCache: Promise<ExtendedVehicle[]> | null = null;
+
+async function loadVehiclesFromDb(): Promise<ExtendedVehicle[]> {
+  try {
+    const { data, error } = await supabase.from('vehicles').select('*');
+    if (error) {
+      console.error('[vehicles-db] Supabase read failed, falling back to mock catalog:', error.message);
+      return [...VEHICLES];
+    }
+    if (!data || data.length === 0) {
+      console.warn('[vehicles-db] Supabase returned no vehicles, falling back to mock catalog.');
+      return [...VEHICLES];
+    }
+    return (data as VehicleRow[]).map(mapVehicleRow);
+  } catch (err) {
+    console.error('[vehicles-db] Unexpected error loading vehicles, falling back to mock catalog:', err);
+    return [...VEHICLES];
+  }
+}
+
+/** Cached, deduped load of the full catalog from Supabase. */
+export function getVehiclesCached(): Promise<ExtendedVehicle[]> {
+  if (!vehiclesCache) vehiclesCache = loadVehiclesFromDb();
+  return vehiclesCache;
+}
+
+/** Bust the module-level cache and re-fetch (call after admin/dealer writes). */
+export function refreshVehicles(): Promise<ExtendedVehicle[]> {
+  vehiclesCache = loadVehiclesFromDb();
+  return vehiclesCache;
+}
+
+/** Async catalog query — reads from Supabase, applies the shared filters. */
+export async function getVehiclesAsync(params: VehicleQuery = {}): Promise<ExtendedVehicle[]> {
+  const list = await getVehiclesCached();
+  return applyVehicleFilters(list, params);
+}
+
+/** Resolve a single vehicle by DB uuid OR slug (uuid preferred). */
+export async function getVehicleByIdAsync(id: string): Promise<ExtendedVehicle | undefined> {
+  if (!id) return undefined;
+  const list = await getVehiclesCached();
+  return list.find(v => v.id === id) || list.find(v => v.slug === id);
+}
+
+/**
+ * @deprecated Synchronous mock-backed query. Use getVehiclesAsync — the site now
+ * reads the catalog from Supabase. Kept temporarily so nothing breaks mid-transition.
+ */
+export function getVehicles(params: VehicleQuery = {}) {
+  return applyVehicleFilters([...VEHICLES], params);
+}
+
+/**
+ * @deprecated Synchronous mock-backed lookup by mock id. Use getVehicleByIdAsync,
+ * which resolves the real Supabase uuid or slug.
+ */
 export function getVehicleById(id: string): ExtendedVehicle | undefined {
   return VEHICLES.find(v => v.id === id);
 }

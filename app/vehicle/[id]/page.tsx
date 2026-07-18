@@ -1,4 +1,4 @@
-import { getVehicleById, getVehicles } from "@/lib/vehicles-db";
+import { getVehicleByIdAsync, getVehiclesAsync } from "@/lib/vehicles-db";
 import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -9,7 +9,9 @@ import { recordAdminView } from "@/lib/admin-vehicle-views";
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const vehicle = getVehicleById(id);
+  // id may be a real vehicles.id uuid or a slug — resolve either to the DB row
+  // so downstream bookings use the canonical vehicles.id uuid.
+  const vehicle = await getVehicleByIdAsync(id);
 
   if (!vehicle) {
     notFound();
@@ -34,7 +36,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   });
 
   // Rivals: same fuel type, same brand first, then closest by price.
-  const similar = getVehicles()
+  const similar = (await getVehiclesAsync())
     .filter((x) => x.id !== vehicle.id && x.fuel === vehicle.fuel)
     .sort(
       (a, b) =>

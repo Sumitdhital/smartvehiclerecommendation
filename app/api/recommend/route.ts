@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getVehicles } from '@/lib/vehicles-db';
+import { getVehiclesAsync } from '@/lib/vehicles-db';
 import { calculateNepalOnRoadPrice } from '@/lib/tax-engine';
 
 export async function POST(request: Request) {
@@ -16,8 +16,8 @@ export async function POST(request: Request) {
     // Validate budget
     const budgetMax = budget ? Number(budget) : undefined;
 
-    // Fetch filtered list from local mock DB
-    const list = getVehicles({
+    // Fetch filtered list from the Supabase-backed catalog
+    const list = await getVehiclesAsync({
       budgetMax,
       brand,
       searchTerm,

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
-export type FieldType = "text" | "number" | "textarea" | "checkbox" | "select" | "tags";
+export type FieldType = "text" | "number" | "textarea" | "checkbox" | "select" | "tags" | "photos";
 
 export interface FieldDef {
   name: string;
@@ -14,12 +14,16 @@ export interface FieldDef {
   options?: string[]; // for select
   step?: string; // for number
   colSpan?: 1 | 2;
+  section?: string; // groups the field under a header in the edit modal
+  uploadEndpoint?: string; // for "photos": POST target that returns { urls: string[] }
 }
 
 export interface ColumnDef<Row> {
   key: string;
   label: string;
   render?: (row: Row) => React.ReactNode;
+  // When set, the cell can be edited inline in the table (one-field PATCH).
+  inlineEdit?: "text" | "number" | "toggle";
 }
 
 interface Props<Row extends { id: string }> {
@@ -38,7 +42,9 @@ type Values = Record<string, unknown>;
 function emptyValues(fields: FieldDef[]): Values {
   const v: Values = {};
   for (const f of fields) {
-    v[f.name] = f.type === "checkbox" ? false : "";
+    if (f.type === "checkbox") v[f.name] = false;
+    else if (f.type === "photos") v[f.name] = [];
+    else v[f.name] = "";
   }
   return v;
 }
@@ -46,6 +52,7 @@ function emptyValues(fields: FieldDef[]): Values {
 // Row value → form input value
 function toInput(field: FieldDef, raw: unknown): unknown {
   if (field.type === "checkbox") return Boolean(raw);
+  if (field.type === "photos") return Array.isArray(raw) ? raw : [];
   if (field.type === "tags") return Array.isArray(raw) ? raw.join(", ") : raw ?? "";
   if (raw === null || raw === undefined) return "";
   return raw;
@@ -55,6 +62,7 @@ function toInput(field: FieldDef, raw: unknown): unknown {
 function toPayload(field: FieldDef, raw: unknown): unknown {
   const t = field.type ?? "text";
   if (t === "checkbox") return Boolean(raw);
+  if (t === "photos") return Array.isArray(raw) ? raw.filter((x) => typeof x === "string" && x) : [];
   if (t === "number") {
     if (raw === "" || raw === null || raw === undefined) return null;
     const n = Number(raw);
@@ -67,6 +75,21 @@ function toPayload(field: FieldDef, raw: unknown): unknown {
   const s = String(raw ?? "").trim();
   if (s === "") return field.required ? "" : null;
   return s;
+}
+
+// Preserve first-appearance order while grouping fields by their section.
+function groupFields(fields: FieldDef[]): { section: string | null; fields: FieldDef[] }[] {
+  const groups: { section: string | null; fields: FieldDef[] }[] = [];
+  const index = new Map<string, number>();
+  for (const f of fields) {
+    const key = f.section ?? "";
+    if (!index.has(key)) {
+      index.set(key, groups.length);
+      groups.push({ section: f.section ?? null, fields: [] });
+    }
+    groups[index.get(key)!].fields.push(f);
+  }
+  return groups;
 }
 
 export default function ResourceManager<Row extends { id: string }>({
@@ -89,6 +112,17 @@ export default function ResourceManager<Row extends { id: string }>({
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Photo-upload state (keyed by field name).
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState("");
+
+  // Inline table-edit state.
+  const [editCell, setEditCell] = useState<{ id: string; key: string } | null>(null);
+  const [cellDraft, setCellDraft] = useState("");
+  const [cellSaving, setCellSaving] = useState(false);
+  // Guards against Enter + blur both committing the same inline edit.
+  const committingRef = useRef(false);
 
   const load = async () => {
     setLoading(true);
@@ -114,6 +148,7 @@ export default function ResourceManager<Row extends { id: string }>({
     setEditingId(null);
     setValues(emptyValues(fields));
     setFormError("");
+    setPhotoError("");
     setModalOpen(true);
   };
 
@@ -124,7 +159,37 @@ export default function ResourceManager<Row extends { id: string }>({
     for (const f of fields) v[f.name] = toInput(f, (row as Record<string, unknown>)[f.name]);
     setValues(v);
     setFormError("");
+    setPhotoError("");
     setModalOpen(true);
+  };
+
+  const uploadPhotos = async (field: FieldDef, files: File[]) => {
+    if (!field.uploadEndpoint || files.length === 0) return;
+    setUploadingField(field.name);
+    setPhotoError("");
+    try {
+      const fd = new FormData();
+      for (const file of files) fd.append("files", file);
+      const res = await fetch(field.uploadEndpoint, { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Upload failed.");
+      const urls: string[] = Array.isArray(json.urls) ? json.urls : [];
+      setValues((s) => {
+        const cur = Array.isArray(s[field.name]) ? (s[field.name] as string[]) : [];
+        return { ...s, [field.name]: [...cur, ...urls] };
+      });
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploadingField(null);
+    }
+  };
+
+  const removePhoto = (fieldName: string, idx: number) => {
+    setValues((s) => {
+      const cur = Array.isArray(s[fieldName]) ? (s[fieldName] as string[]) : [];
+      return { ...s, [fieldName]: cur.filter((_, i) => i !== idx) };
+    });
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -181,7 +246,48 @@ export default function ResourceManager<Row extends { id: string }>({
     }
   };
 
-  const renderCell = (col: ColumnDef<Row>, row: Row) => {
+  // One-field PATCH used by inline table editing.
+  const patchCell = async (id: string, key: string, value: unknown) => {
+    setCellSaving(true);
+    try {
+      const res = await fetch(`${endpoint}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Save failed.");
+      const updated = json.data as Row | undefined;
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...(updated ?? { [key]: value }) } : r)));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Save failed.");
+      await load();
+    } finally {
+      setCellSaving(false);
+      setEditCell(null);
+    }
+  };
+
+  const startCellEdit = (row: Row, col: ColumnDef<Row>) => {
+    const raw = (row as Record<string, unknown>)[col.key];
+    setCellDraft(raw === null || raw === undefined ? "" : String(raw));
+    setEditCell({ id: row.id, key: col.key });
+  };
+
+  const commitCellEdit = (col: ColumnDef<Row>, id: string) => {
+    if (committingRef.current) return;
+    const value = col.inlineEdit === "number" ? (cellDraft === "" ? null : Number(cellDraft)) : cellDraft.trim();
+    if (col.inlineEdit === "number" && value !== null && Number.isNaN(value)) {
+      setEditCell(null);
+      return;
+    }
+    committingRef.current = true;
+    patchCell(id, col.key, value).finally(() => {
+      committingRef.current = false;
+    });
+  };
+
+  const displayValue = (col: ColumnDef<Row>, row: Row): React.ReactNode => {
     if (col.render) return col.render(row);
     const raw = (row as Record<string, unknown>)[col.key];
     if (Array.isArray(raw)) return raw.join(", ");
@@ -189,6 +295,182 @@ export default function ResourceManager<Row extends { id: string }>({
     if (raw === null || raw === undefined) return "—";
     return String(raw);
   };
+
+  const renderCell = (col: ColumnDef<Row>, row: Row): React.ReactNode => {
+    if (!col.inlineEdit) return displayValue(col, row);
+
+    const isEditing = editCell?.id === row.id && editCell?.key === col.key;
+
+    if (col.inlineEdit === "toggle") {
+      const raw = Boolean((row as Record<string, unknown>)[col.key]);
+      return (
+        <button
+          type="button"
+          disabled={cellSaving}
+          onClick={() => patchCell(row.id, col.key, !raw)}
+          className="cursor-pointer disabled:opacity-50"
+          title="Click to toggle"
+        >
+          {displayValue(col, row)}
+        </button>
+      );
+    }
+
+    if (isEditing) {
+      return (
+        <input
+          autoFocus
+          type={col.inlineEdit === "number" ? "number" : "text"}
+          value={cellDraft}
+          disabled={cellSaving}
+          onChange={(e) => setCellDraft(e.target.value)}
+          onBlur={() => commitCellEdit(col, row.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitCellEdit(col, row.id);
+            } else if (e.key === "Escape") {
+              setEditCell(null);
+            }
+          }}
+          className="w-28 rounded-lg border border-blue-300 bg-white px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        />
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => startCellEdit(row, col)}
+        className="cursor-pointer rounded px-1 -mx-1 text-left hover:bg-blue-50 hover:text-blue-700"
+        title="Click to edit"
+      >
+        {displayValue(col, row)}
+      </button>
+    );
+  };
+
+  const renderField = (f: FieldDef): React.ReactNode => {
+    const id = `field-${f.name}`;
+    const val = values[f.name];
+    const wrapClass =
+      f.colSpan === 2 || f.type === "textarea" || f.type === "photos" ? "sm:col-span-2" : "";
+
+    if (f.type === "checkbox") {
+      return (
+        <label
+          key={f.name}
+          className={`flex items-center gap-2.5 ${wrapClass} bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 cursor-pointer`}
+        >
+          <input
+            type="checkbox"
+            checked={Boolean(val)}
+            onChange={(e) => setValues((s) => ({ ...s, [f.name]: e.target.checked }))}
+            className="w-4 h-4 rounded accent-blue-600"
+          />
+          <span className="text-sm font-bold text-slate-700">{f.label}</span>
+        </label>
+      );
+    }
+
+    if (f.type === "photos") {
+      const arr = Array.isArray(val) ? (val as string[]) : [];
+      const uploading = uploadingField === f.name;
+      return (
+        <div key={f.name} className={`flex flex-col gap-2 ${wrapClass}`}>
+          <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">{f.label}</label>
+          <div className="flex flex-wrap gap-2.5">
+            {arr.map((url, i) => (
+              <div key={`${url}-${i}`} className="relative group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`Photo ${i + 1}`}
+                  className="h-20 w-28 rounded-lg border border-slate-200 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removePhoto(f.name, i)}
+                  aria-label="Remove photo"
+                  className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-red-50 hover:text-red-600"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+            <label
+              className={`flex h-20 w-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-300 text-xs font-bold text-slate-500 hover:border-blue-400 hover:text-blue-600 ${
+                uploading ? "opacity-60 pointer-events-none" : ""
+              }`}
+            >
+              {uploading ? "Uploading…" : "+ Upload"}
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  e.target.value = "";
+                  uploadPhotos(f, files);
+                }}
+              />
+            </label>
+          </div>
+          {photoError && uploadingField === null && (
+            <span className="text-[11px] font-bold text-red-500">{photoError}</span>
+          )}
+          {f.help && <span className="text-[11px] text-slate-400 font-medium">{f.help}</span>}
+        </div>
+      );
+    }
+
+    return (
+      <div key={f.name} className={`flex flex-col gap-1.5 ${wrapClass}`}>
+        <label htmlFor={id} className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+          {f.label}
+          {f.required && <span className="text-red-500 ml-0.5">*</span>}
+        </label>
+        {f.type === "textarea" ? (
+          <textarea
+            id={id}
+            value={String(val ?? "")}
+            onChange={(e) => setValues((s) => ({ ...s, [f.name]: e.target.value }))}
+            placeholder={f.placeholder}
+            rows={3}
+            className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium resize-y"
+          />
+        ) : f.type === "select" ? (
+          <select
+            id={id}
+            value={String(val ?? "")}
+            onChange={(e) => setValues((s) => ({ ...s, [f.name]: e.target.value }))}
+            className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+          >
+            <option value="">Select…</option>
+            {f.options?.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            id={id}
+            type={f.type === "number" ? "number" : "text"}
+            step={f.step}
+            value={String(val ?? "")}
+            onChange={(e) => setValues((s) => ({ ...s, [f.name]: e.target.value }))}
+            placeholder={f.placeholder}
+            className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+          />
+        )}
+        {f.help && <span className="text-[11px] text-slate-400 font-medium">{f.help}</span>}
+      </div>
+    );
+  };
+
+  const groups = groupFields(fields);
 
   return (
     <div className="flex flex-col gap-6">
@@ -211,7 +493,9 @@ export default function ResourceManager<Row extends { id: string }>({
         ) : listError ? (
           <div className="p-10 text-center">
             <p className="text-sm font-bold text-red-600">{listError}</p>
-            <button onClick={load} className="mt-3 text-xs font-bold text-blue-600 hover:underline">Retry</button>
+            <button onClick={load} className="mt-3 text-xs font-bold text-blue-600 hover:underline">
+              Retry
+            </button>
           </div>
         ) : rows.length === 0 ? (
           <div className="p-12 text-center">
@@ -224,7 +508,9 @@ export default function ResourceManager<Row extends { id: string }>({
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-extrabold text-xs uppercase tracking-wider">
                   {columns.map((c) => (
-                    <th key={c.key} className="px-4 py-3 whitespace-nowrap">{c.label}</th>
+                    <th key={c.key} className="px-4 py-3 whitespace-nowrap">
+                      {c.label}
+                    </th>
                   ))}
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -233,7 +519,9 @@ export default function ResourceManager<Row extends { id: string }>({
                 {rows.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
                     {columns.map((c) => (
-                      <td key={c.key} className="px-4 py-3 whitespace-nowrap max-w-[240px] truncate">{renderCell(c, row)}</td>
+                      <td key={c.key} className="px-4 py-3 whitespace-nowrap max-w-[240px] truncate">
+                        {renderCell(c, row)}
+                      </td>
                     ))}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
@@ -261,7 +549,10 @@ export default function ResourceManager<Row extends { id: string }>({
       </div>
 
       {!loading && !listError && rows.length > 0 && (
-        <p className="text-xs font-semibold text-slate-400">{rows.length} {itemNoun}{rows.length === 1 ? "" : "s"}</p>
+        <p className="text-xs font-semibold text-slate-400">
+          {rows.length} {itemNoun}
+          {rows.length === 1 ? "" : "s"}
+        </p>
       )}
 
       {modalOpen && (
@@ -288,62 +579,16 @@ export default function ResourceManager<Row extends { id: string }>({
 
             <form onSubmit={submit} className="flex flex-col overflow-hidden">
               <div className="overflow-y-auto px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {fields.map((f) => {
-                  const id = `field-${f.name}`;
-                  const val = values[f.name];
-                  const wrapClass = f.colSpan === 2 || f.type === "textarea" ? "sm:col-span-2" : "";
-                  if (f.type === "checkbox") {
-                    return (
-                      <label key={f.name} className={`flex items-center gap-2.5 ${wrapClass} bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 cursor-pointer`}>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(val)}
-                          onChange={(e) => setValues((s) => ({ ...s, [f.name]: e.target.checked }))}
-                          className="w-4 h-4 rounded accent-blue-600"
-                        />
-                        <span className="text-sm font-bold text-slate-700">{f.label}</span>
-                      </label>
-                    );
-                  }
-                  return (
-                    <div key={f.name} className={`flex flex-col gap-1.5 ${wrapClass}`}>
-                      <label htmlFor={id} className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
-                        {f.label}{f.required && <span className="text-red-500 ml-0.5">*</span>}
-                      </label>
-                      {f.type === "textarea" ? (
-                        <textarea
-                          id={id}
-                          value={String(val ?? "")}
-                          onChange={(e) => setValues((s) => ({ ...s, [f.name]: e.target.value }))}
-                          placeholder={f.placeholder}
-                          rows={3}
-                          className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium resize-y"
-                        />
-                      ) : f.type === "select" ? (
-                        <select
-                          id={id}
-                          value={String(val ?? "")}
-                          onChange={(e) => setValues((s) => ({ ...s, [f.name]: e.target.value }))}
-                          className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-                        >
-                          <option value="">Select…</option>
-                          {f.options?.map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      ) : (
-                        <input
-                          id={id}
-                          type={f.type === "number" ? "number" : "text"}
-                          step={f.step}
-                          value={String(val ?? "")}
-                          onChange={(e) => setValues((s) => ({ ...s, [f.name]: e.target.value }))}
-                          placeholder={f.placeholder}
-                          className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-                        />
-                      )}
-                      {f.help && <span className="text-[11px] text-slate-400 font-medium">{f.help}</span>}
-                    </div>
-                  );
-                })}
+                {groups.map((g) => (
+                  <React.Fragment key={g.section ?? "_default"}>
+                    {g.section && (
+                      <div className="sm:col-span-2 mt-1 border-b border-slate-100 pb-1.5 text-xs font-black uppercase tracking-wider text-slate-400">
+                        {g.section}
+                      </div>
+                    )}
+                    {g.fields.map((f) => renderField(f))}
+                  </React.Fragment>
+                ))}
               </div>
 
               {formError && (

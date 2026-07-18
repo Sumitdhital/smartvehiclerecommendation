@@ -5,75 +5,43 @@ import Link from "next/link";
 import type { ExtendedVehicle } from "@/lib/vehicles-db";
 import type { TaxBreakdown } from "@/lib/tax-engine";
 import { I } from "./icons";
-import { npr, psToKw, monthlyEmi, EMI_RATE, EMI_YEARS } from "./format";
+import { npr, psToKw, monthlyEmi, EMI_DEFAULT_DOWN_PCT, EMI_RATE, EMI_YEARS } from "./format";
+import { EmiCalculatorModal } from "./EmiCalculatorModal";
 
 /**
- * Inline EMI calculator kept from the original hero. Task T11 replaces this
- * with a dedicated modal — until then it stays as the reference shows it.
+ * Compact EMI teaser on the price card — a "from Rs. X/mo" line plus a button
+ * that opens the full reference EMI calculator modal (Task T11). The monthly
+ * figure uses the calculator's defaults (40% down, 8.5% over 5 years).
  */
-function EmiCalculator({ price }: { price: number }) {
-  const [downPct, setDownPct] = useState(40);
-  const [showBreakdown, setShowBreakdown] = useState(false);
+function EmiTeaser({ vehicle }: { vehicle: ExtendedVehicle }) {
+  const [open, setOpen] = useState(false);
 
-  const down = price * (downPct / 100);
-  const loan = price - down;
+  const loan = vehicle.price * (1 - EMI_DEFAULT_DOWN_PCT / 100);
   const emi = monthlyEmi(loan);
-  const totalPayable = emi * EMI_YEARS * 12;
 
   return (
-    <div className="rounded-xl bg-slate-50 border border-slate-100 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">EMI Calculator</span>
-      </div>
-      <div className="mt-1.5 flex items-baseline justify-between gap-3">
-        <div className="flex items-baseline gap-1">
-          <span className="text-xl font-extrabold tracking-tight text-blue-600">{npr(emi)}</span>
-          <span className="text-xs font-semibold text-slate-400">/mo</span>
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">EMI starting from</span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl font-extrabold tracking-tight text-blue-600">{npr(emi)}</span>
+            <span className="text-xs font-semibold text-slate-400">/mo</span>
+          </div>
+          <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+            {EMI_DEFAULT_DOWN_PCT}% down · {EMI_YEARS}yr @ {EMI_RATE}%
+          </p>
         </div>
         <button
-          onClick={() => setShowBreakdown((s) => !s)}
-          aria-expanded={showBreakdown}
-          className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex-shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 transition-colors hover:bg-slate-100"
         >
-          {showBreakdown ? "Hide Breakdown" : "View Breakdown"}
+          Open EMI Calculator
         </button>
       </div>
-      <p className="mt-1 text-xs font-medium text-slate-500">
-        {downPct}% down ({npr(down)}) · {EMI_YEARS}yr @ {EMI_RATE}%
-      </p>
 
-      <div className="mt-3 flex items-center gap-3">
-        <span className="text-[11px] font-bold text-slate-400">20%</span>
-        <input
-          type="range"
-          min={20}
-          max={80}
-          step={5}
-          value={downPct}
-          onChange={(e) => setDownPct(Number(e.target.value))}
-          aria-label="Down payment percentage"
-          className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
-        />
-        <span className="text-[11px] font-bold text-slate-400">80%</span>
-      </div>
-
-      <div className={`grid transition-all duration-200 motion-reduce:transition-none ${showBreakdown ? "grid-rows-[1fr] mt-3" : "grid-rows-[0fr]"}`}>
-        <div className="overflow-hidden">
-          <dl className="space-y-1.5 rounded-lg border border-slate-200 bg-white p-3 text-xs font-semibold">
-            {[
-              ["Down payment", npr(down)],
-              ["Loan amount", npr(loan)],
-              ["Total interest", npr(totalPayable - loan)],
-              ["Total payable", npr(totalPayable + down)],
-            ].map(([k, v]) => (
-              <div key={k} className="flex justify-between">
-                <dt className="text-slate-500">{k}</dt>
-                <dd className="text-blue-950">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </div>
+      <EmiCalculatorModal open={open} onClose={() => setOpen(false)} vehicle={vehicle} />
     </div>
   );
 }
@@ -123,7 +91,7 @@ export function PriceCard({ vehicle: v, tax }: { vehicle: ExtendedVehicle; tax: 
       </p>
 
       <div className="mt-5">
-        <EmiCalculator price={v.price} />
+        <EmiTeaser vehicle={v} />
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2.5">

@@ -234,6 +234,64 @@ export function PasswordField({
   );
 }
 
+export function SegmentedControl<T extends string>({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  id: string;
+  label: string;
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div>
+      <span id={`${id}-label`} className={LABEL}>
+        {label}
+      </span>
+      <div
+        role="radiogroup"
+        aria-labelledby={`${id}-label`}
+        className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1"
+      >
+        {options.map((opt) => {
+          const selected = opt.value === value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              id={`${id}-${opt.value}`}
+              role="radio"
+              aria-checked={selected}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => onChange(opt.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+                e.preventDefault();
+                const idx = options.findIndex((o) => o.value === value);
+                const dir = e.key === "ArrowRight" ? 1 : -1;
+                const next = options[(idx + dir + options.length) % options.length];
+                onChange(next.value);
+                document.getElementById(`${id}-${next.value}`)?.focus();
+              }}
+              className={`rounded-lg px-4 py-2.5 text-sm font-bold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                selected
+                  ? "bg-white text-blue-600 shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function FormError({ children }: { children?: React.ReactNode }) {
   if (!children) return null;
   return (

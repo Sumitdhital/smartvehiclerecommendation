@@ -5,7 +5,7 @@ import { UserMenu } from "@/components/auth/UserMenu";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 /** Shared sticky header for sub-pages (used marketplace, listing form). */
-export function SiteHeader({ active }: { active?: "find" | "used" | "compare" }) {
+export function SiteHeader({ active }: { active?: "find" | "used" | "rentals" | "compare" }) {
   const navLink = (href: string, key: string, label: string) => (
     <Link
       href={href}
@@ -45,6 +45,7 @@ export function SiteHeader({ active }: { active?: "find" | "used" | "compare" })
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
             {navLink("/", "find", "Find cars")}
             {navLink("/used", "used", "Used cars")}
+            {navLink("/rentals", "rentals", "Rentals")}
             {navLink("/compare", "compare", "Compare")}
           </nav>
         </div>

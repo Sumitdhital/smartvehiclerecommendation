@@ -625,6 +625,7 @@ export default function VehicleDetail({
         open={showTestDrive}
         onClose={() => setShowTestDrive(false)}
         vehicleLabel={`${v.brand} ${v.model} ${v.variant}`.trim()}
+        vehicleId={v.id}
       />
     </main>
   );

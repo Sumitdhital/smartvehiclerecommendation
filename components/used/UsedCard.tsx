@@ -6,7 +6,7 @@ import { BookTestDriveModal } from "@/components/vehicle/BookTestDriveModal";
 
 /** Marketplace listing card — same visual language as the old home section,
  *  with real photo support for community listings. */
-export function UsedCard({ item }: { item: UsedCardData }) {
+export function UsedCard({ item }: { item: UsedCardData; currentUserId?: string }) {
   const [showPhone, setShowPhone] = useState(false);
   const [showTestDrive, setShowTestDrive] = useState(false);
 

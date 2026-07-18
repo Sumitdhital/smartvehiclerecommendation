@@ -760,7 +760,7 @@ export const ALL_COMPARISONS = [
   { id: "comp-7", v1: "BYD Atto 2", price1: "Rs. 48,99,000", v2: "Tata Nexon EV", price2: "Rs. 40,99,000", ids: ["byd-atto2", "tata-nexon-ev"] }
 ];
 
-export function getVehicles(params: FilterParams & { showDiscountedOnly?: boolean; searchTerm?: string } = {}) {
+export function getVehicles(params: FilterParams & { showDiscountedOnly?: boolean; searchTerm?: string; model?: string } = {}) {
   let list = [...VEHICLES];
 
   // 1. Search term filter

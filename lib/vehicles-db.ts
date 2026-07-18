@@ -1053,6 +1053,95 @@ export async function getVehicleByIdAsync(id: string): Promise<ExtendedVehicle |
   return list.find(v => v.id === id) || list.find(v => v.slug === id);
 }
 
+/** Input collected by the dealer "add a new car" form (app/dealer/new-car). */
+export interface NewVehicleInput {
+  brand: string;
+  model: string;
+  variant?: string;
+  type: VehicleType;
+  fuel: FuelType;
+  price: number;
+  seatingCapacity: number;
+  transmission: TransmissionType;
+  engineCc?: number;
+  batteryKwh?: number;
+  rangeKm?: number;
+  horsepower?: number;
+  torque?: number;
+  mileage?: number;
+  groundClearance?: number;
+  bootSpace?: number;
+  safetyRating?: number;
+  keyFeatures?: string[];
+  imageUrl?: string;
+  description?: string;
+  yearLaunched?: number;
+}
+
+/**
+ * Inserts a new catalog row owned by the signed-in dealer. RLS
+ * (vehicles_dealer_insert) enforces owner_id = auth.uid() AND the caller's
+ * user_metadata.account_type = 'dealer' — this function relies on that check
+ * rather than re-validating the role itself. Slugs are unique in the DB; on a
+ * collision we retry once with a short random suffix.
+ */
+export async function insertVehicle(input: NewVehicleInput): Promise<{ id: string }> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const ownerId = sessionData.session?.user?.id;
+  if (!ownerId) {
+    throw new Error('You must be signed in as a dealer to list a car.');
+  }
+
+  const baseSlug = slugify(`${input.brand}-${input.model}-${input.variant ?? ''}`);
+  const row = {
+    brand: input.brand,
+    model: input.model,
+    variant: input.variant?.trim() || '',
+    type: input.type,
+    fuel: input.fuel,
+    engine_cc: input.engineCc ?? null,
+    battery_kwh: input.batteryKwh ?? null,
+    range_km: input.rangeKm ?? null,
+    horsepower: input.horsepower ?? null,
+    torque: input.torque ?? null,
+    mileage: input.mileage ?? null,
+    seating_capacity: input.seatingCapacity,
+    transmission: input.transmission,
+    ground_clearance: input.groundClearance ?? null,
+    price: input.price,
+    boot_space: input.bootSpace ?? null,
+    safety_rating: input.safetyRating ?? null,
+    key_features: input.keyFeatures ?? [],
+    image_url: input.imageUrl || null,
+    images: input.imageUrl ? [input.imageUrl] : [],
+    description: input.description || '',
+    year_launched: input.yearLaunched ?? new Date().getFullYear(),
+    is_ev: input.fuel === 'Electric',
+    category: 'car',
+    slug: baseSlug,
+    brand_slug: slugify(input.brand),
+    owner_id: ownerId,
+  };
+
+  let { data, error } = await supabase.from('vehicles').insert(row).select('id').single();
+
+  if (error && error.code === '23505') {
+    // Unique slug collision — retry once with a short random suffix.
+    const suffix = Math.random().toString(36).slice(2, 6);
+    ({ data, error } = await supabase
+      .from('vehicles')
+      .insert({ ...row, slug: `${baseSlug}-${suffix}` })
+      .select('id')
+      .single());
+  }
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('Could not create the listing — please try again.');
+
+  await refreshVehicles();
+  return { id: (data as { id: string }).id };
+}
+
 /**
  * @deprecated Synchronous mock-backed query. Use getVehiclesAsync — the site now
  * reads the catalog from Supabase. Kept temporarily so nothing breaks mid-transition.

@@ -207,6 +207,23 @@ export function UserMenu({ signInClassName }: { signInClassName?: string }) {
           </div>
 
           <div className="py-1.5">
+            {user.user_metadata?.account_type === "dealer" && (
+              <Link
+                href="/dealer/new-car"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-bold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-600"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.25h-8.25a1.125 1.125 0 0 0-1.125 1.125v9.75c0 .621.504 1.125 1.125 1.125h.375m10.125-12v11.25M9 6.75h.75M9 6.75a2.25 2.25 0 0 0-2.25 2.25v.75m2.25-3H12"
+                  />
+                </svg>
+                List a new car
+              </Link>
+            )}
             <Link
               href="/history"
               role="menuitem"

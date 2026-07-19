@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Footer } from "@/components/Footer";
 import { ProfileCard } from "@/components/dashboard/ProfileCard";
 import { MyListingsSection } from "@/components/dashboard/MyListingsSection";
 import { TestDrivesSection } from "@/components/dashboard/TestDrivesSection";
@@ -99,11 +100,7 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      <footer className="mt-12 w-full border-t border-slate-100 bg-white py-8 text-center">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:text-xs">
-          Copyright © 2026 SaaS Nepal. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

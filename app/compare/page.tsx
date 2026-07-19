@@ -7,6 +7,7 @@ import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Footer } from "@/components/Footer";
 
 // Custom icons
 const CloseIcon = () => (
@@ -807,21 +808,7 @@ function ComparePageContent() {
         />
       )}
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-100 py-10 mt-12 w-full text-center flex flex-col gap-6">
-        <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs sm:text-sm font-semibold text-slate-500">
-          <Link href="/" className="hover:text-blue-600 transition-colors">Vehicle Price List</Link>
-          <Link href="/" className="hover:text-blue-600 transition-colors">Electric Cars</Link>
-          <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare EVs</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">EMI Calculator</Link>
-          <Link href="/#used-marketplace" className="hover:text-blue-600 transition-colors">Used EVs</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Brands</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">About</Link>
-        </div>
-        <div className="text-slate-400 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
-          Copyright © 2026 SaaS Nepal. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

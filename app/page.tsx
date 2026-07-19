@@ -7,6 +7,7 @@ import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Footer } from "@/components/Footer";
 import cardStyles from "./car-card.module.css";
 
 // Simple custom inline SVG components for icons to ensure zero dependency mismatch issues
@@ -99,7 +100,6 @@ function HomeContent() {
   const [discountFilter, setDiscountFilter] = useState(false);
   const [maxPriceLimit, setMaxPriceLimit] = useState<number | undefined>(undefined);
   const [sortBy, setSortBy] = useState("rating");
-  const [viewMode, setViewMode] = useState<"detailed" | "compact">("detailed");
 
   // EMI Calculator Modal State
   const [selectedEmiVehicle, setSelectedEmiVehicle] = useState<ExtendedVehicle | null>(null);
@@ -201,10 +201,10 @@ function HomeContent() {
         {/* Title Block */}
         <div className="text-center py-4">
           <h1 className="text-3xl sm:text-4xl font-black text-blue-950 tracking-tight" id="main-page-title">
-            Electric car price in Nepal
+            Vehicles car price in Nepal
           </h1>
           <p className="text-slate-500 font-medium text-sm sm:text-base mt-2">
-            Search for prices of all electric cars available in Nepal.
+           Stop dreaming about the road and start driving your dream car today. 
           </p>
         </div>
 
@@ -380,28 +380,12 @@ function HomeContent() {
                   <option value="price-desc">Price: High to Low</option>
                   <option value="range-desc">Highest Range</option>
                 </select>
-
-                {/* View switcher */}
-                <div className="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200/30">
-                  <button 
-                    onClick={() => setViewMode("detailed")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${viewMode === "detailed" ? 'bg-white text-blue-950 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    📝 <span className="hidden sm:inline">Detailed</span>
-                  </button>
-                  <button 
-                    onClick={() => setViewMode("compact")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${viewMode === "compact" ? 'bg-white text-blue-950 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    🎛️ <span className="hidden sm:inline">Compact</span>
-                  </button>
-                </div>
               </div>
             </div>
 
             {/* Results Vehicle Grid */}
             {loadingVehicles ? (
-              <div className={`grid gap-6 ${viewMode === "compact" ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"}`}>
+              <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className={cardStyles.card} aria-hidden="true">
                     <div className="h-full w-full animate-pulse rounded-2xl border border-slate-200 bg-slate-100">
@@ -427,7 +411,7 @@ function HomeContent() {
                 </button>
               </div>
             ) : (
-              <div className={`grid gap-6 ${viewMode === "compact" ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"}`}>
+              <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                 {filteredVehicles.map((vehicle) => {
                   const isCompared = compareVehicles.some(v => v.id === vehicle.id);
                   const monthlyEmi = calculateEMI(vehicle.price);
@@ -640,22 +624,7 @@ function HomeContent() {
         </div>
       )}
 
-      {/* 5. Footer Layout */}
-      <footer className="bg-white border-t border-slate-100 py-10 mt-12 w-full text-center flex flex-col gap-6">
-        <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs sm:text-sm font-semibold text-slate-500">
-          <Link href="#" className="hover:text-blue-600 transition-colors">Vehicle Price List</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Electric Cars</Link>
-          <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare EVs</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">EMI Calculator</Link>
-          <Link href="/used" className="hover:text-blue-600 transition-colors">Used EVs</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Brands</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">About</Link>
-        </div>
-
-        <div className="text-slate-400 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
-          Copyright © 2026 SaaS Nepal. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

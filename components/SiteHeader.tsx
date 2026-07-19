@@ -116,10 +116,6 @@ export function SiteHeader({
             {navLink("/rentals", "rentals", "Rentals")}
             <CarsDropdown activeFuel={activeFuel} />
             {navLink("/compare", "compare", "Compare")}
-            <div className="flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors">
-              <span>Tools</span>
-              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
-            </div>
           </nav>
         </div>
 
@@ -193,7 +189,6 @@ export function SiteHeader({
           </div>
 
           {mobileLink("/compare", "Compare", "mt-1")}
-          <div className="px-3 py-2.5 rounded-xl text-slate-400">Tools</div>
           {mobileLink("/used/new", "+ List your car", "sm:hidden text-blue-600")}
         </nav>
       )}

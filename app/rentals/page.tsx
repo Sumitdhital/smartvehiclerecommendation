@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Footer } from "@/components/Footer";
 import { UsedCard } from "@/components/used/UsedCard";
 import { RentalRequestModal } from "@/components/rentals/RentalRequestModal";
 import { fetchCommunityListings, UsedCardData } from "@/lib/used-listings";
@@ -76,12 +77,6 @@ function RentalsMarketplace() {
               </Link>
             </p>
           </div>
-          <Link
-            href="/rentals/new"
-            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-500/25 transition-all hover:-translate-y-0.5 hover:bg-orange-600 motion-reduce:hover:translate-y-0"
-          >
-            + List your car for rent
-          </Link>
         </div>
 
         {/* Success banner after publishing */}
@@ -125,12 +120,6 @@ function RentalsMarketplace() {
             <p className="mt-2 text-sm text-slate-500">
               Try a different brand or city — or be the first to list one.
             </p>
-            <Link
-              href="/rentals/new"
-              className="mt-4 inline-block rounded-xl bg-orange-500 px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-orange-600"
-            >
-              List your car for rent
-            </Link>
           </div>
         ) : (
           <div
@@ -149,11 +138,7 @@ function RentalsMarketplace() {
         )}
       </main>
 
-      <footer className="mt-12 w-full border-t border-slate-100 bg-white py-8 text-center">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:text-xs">
-          Copyright © 2026 SaaS Nepal. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
 
       <RentalRequestModal
         open={requestItem !== null}

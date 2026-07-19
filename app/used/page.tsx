@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Footer } from "@/components/Footer";
 import { UsedCard } from "@/components/used/UsedCard";
 import { seedListingsAsCards, fetchCommunityListings, UsedCardData } from "@/lib/used-listings";
 import { recordSearch } from "@/lib/search-history";
@@ -79,12 +80,6 @@ function UsedMarketplace() {
               </Link>
             </p>
           </div>
-          <Link
-            href="/used/new"
-            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:-translate-y-0.5 hover:bg-blue-700 motion-reduce:hover:translate-y-0"
-          >
-            + List your car
-          </Link>
         </div>
 
         {/* Success banner after publishing */}
@@ -128,12 +123,6 @@ function UsedMarketplace() {
             <p className="mt-2 text-sm text-slate-500">
               Try a different brand or city — or be the first to list one.
             </p>
-            <Link
-              href="/used/new"
-              className="mt-4 inline-block rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-700"
-            >
-              List your car
-            </Link>
           </div>
         ) : (
           <div
@@ -147,11 +136,7 @@ function UsedMarketplace() {
         )}
       </main>
 
-      <footer className="mt-12 w-full border-t border-slate-100 bg-white py-8 text-center">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:text-xs">
-          Copyright © 2026 SaaS Nepal. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

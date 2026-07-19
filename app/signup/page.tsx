@@ -8,16 +8,20 @@ import {
   AuthLayout,
   Field,
   PasswordField,
+  SegmentedControl,
   FormError,
   SubmitButton,
   mapAuthError,
 } from "@/components/auth/AuthUI";
+
+type AccountType = "individual" | "dealer";
 
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [accountType, setAccountType] = useState<AccountType>("individual");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -49,7 +53,7 @@ export default function SignupPage() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, fullName: name.trim() }),
+      body: JSON.stringify({ email, password, fullName: name.trim(), accountType }),
     });
     const body = await res.json().catch(() => ({}));
 
@@ -105,6 +109,16 @@ export default function SignupPage() {
             placeholder="Create a password"
             autoComplete="new-password"
             hint="At least 6 characters."
+          />
+          <SegmentedControl
+            id="account-type"
+            label="I am an…"
+            value={accountType}
+            onChange={setAccountType}
+            options={[
+              { value: "individual", label: "Individual" },
+              { value: "dealer", label: "Dealer" },
+            ]}
           />
           <FormError>{error}</FormError>
           <SubmitButton id="signup-submit-btn" loading={loading} loadingText="Creating account…">

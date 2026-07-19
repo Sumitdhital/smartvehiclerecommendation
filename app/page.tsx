@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useAppStore } from "@/lib/store";
-import { getVehicles, getUsedListings, ExtendedVehicle } from "@/lib/vehicles-db";
+import { getVehiclesAsync, applyVehicleFilters, ExtendedVehicle } from "@/lib/vehicles-db";
 import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserMenu } from "@/components/auth/UserMenu";
+import cardStyles from "./car-card.module.css";
 
 // Simple custom inline SVG components for icons to ensure zero dependency mismatch issues
 const BatteryIcon = () => (
@@ -112,6 +113,30 @@ function CarsDropdown({ activeFuel }: { activeFuel: string }) {
   );
 }
 
+// VehiclePhoto: renders the vehicle's primary image, falling back to a
+// branded text placeholder when there's no image or it fails to load.
+function VehiclePhoto({ vehicle }: { vehicle: ExtendedVehicle }) {
+  const [imgError, setImgError] = useState(false);
+  const src = vehicle.images && vehicle.images[0];
+
+  if (!src || imgError) {
+    return (
+      <div className={cardStyles.fallback}>
+        {vehicle.brand}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={`${vehicle.brand} ${vehicle.model}`}
+      className={cardStyles.photo}
+      onError={() => setImgError(true)}
+    />
+  );
+}
+
 function HomeContent() {
 
   const router = useRouter();
@@ -132,9 +157,6 @@ function HomeContent() {
 
   // Mobile navigation menu (shown below the lg breakpoint)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Used listing index (for simple carousel slider)
-  const [usedSliderIndex, setUsedSliderIndex] = useState(0);
 
   // EMI Calculator Modal State
   const [selectedEmiVehicle, setSelectedEmiVehicle] = useState<ExtendedVehicle | null>(null);
@@ -163,8 +185,26 @@ function HomeContent() {
 
   const currentModels = brandFilter ? MODELS_BY_BRAND[brandFilter] || [] : [];
 
-  // Filter vehicles list dynamically
-  const filteredVehicles = getVehicles({
+  // Full catalog, loaded once from Supabase on mount.
+  const [allVehicles, setAllVehicles] = useState<ExtendedVehicle[]>([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    getVehiclesAsync()
+      .then((list) => {
+        if (active) setAllVehicles(list);
+      })
+      .finally(() => {
+        if (active) setLoadingVehicles(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Filter vehicles list dynamically (client-side, reusing the shared internals)
+  const filteredVehicles = applyVehicleFilters(allVehicles, {
     searchTerm,
     brand: brandFilter,
     model: modelFilter,
@@ -172,9 +212,7 @@ function HomeContent() {
     sortBy: sortBy as any,
     showDiscountedOnly: discountFilter,
     fuelFilter,
-  } as any);
-
-  const usedListings = getUsedListings();
+  });
 
   // Clear filters
   const handleClearFilters = () => {
@@ -226,7 +264,8 @@ function HomeContent() {
             {/* Desktop Navigation Links */}
             <nav className="hidden lg:flex items-center gap-6 text-sm font-semibold text-slate-600">
               <Link href="/" className="text-blue-600 hover:text-blue-700 transition-colors">Find cars</Link>
-              <Link href="#used-marketplace" className="hover:text-blue-600 transition-colors">Used car</Link>
+              <Link href="/used" className="hover:text-blue-600 transition-colors">Used car</Link>
+              <Link href="/rentals" className="hover:text-blue-600 transition-colors">Rentals</Link>
               {/* Cars dropdown */}
               <CarsDropdown activeFuel={fuelFilter} />
               <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare</Link>
@@ -272,7 +311,8 @@ function HomeContent() {
         {mobileMenuOpen && (
           <nav className="lg:hidden border-t border-slate-100 bg-white px-4 sm:px-6 py-4 flex flex-col gap-1 text-sm font-semibold text-slate-700 shadow-sm">
             <Link href="/" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Find cars</Link>
-            <Link href="#used-marketplace" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Used car</Link>
+            <Link href="/used" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Used car</Link>
+            <Link href="/rentals" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Rentals</Link>
 
             {/* Cars — fuel type filters (same filter as the sidebar) */}
             <div className="mt-1 px-3 pt-2 pb-1 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Cars</div>
@@ -509,7 +549,22 @@ function HomeContent() {
             </div>
 
             {/* Results Vehicle Grid */}
-            {filteredVehicles.length === 0 ? (
+            {loadingVehicles ? (
+              <div className={`grid gap-6 ${viewMode === "compact" ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"}`}>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className={cardStyles.card} aria-hidden="true">
+                    <div className="h-full w-full animate-pulse rounded-2xl border border-slate-200 bg-slate-100">
+                      <div className="h-40 w-full rounded-t-2xl bg-slate-200/70" />
+                      <div className="flex flex-col gap-2 p-4">
+                        <div className="h-4 w-2/3 rounded bg-slate-200" />
+                        <div className="h-3 w-1/2 rounded bg-slate-200/80" />
+                        <div className="mt-2 h-5 w-1/3 rounded bg-slate-200" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredVehicles.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
                 <p className="text-lg font-bold text-slate-700">No vehicles found matching filters</p>
                 <p className="text-sm text-slate-500 mt-2">Try adjusting your pricing limit or search keywords.</p>
@@ -524,105 +579,86 @@ function HomeContent() {
               <div className={`grid gap-6 ${viewMode === "compact" ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"}`}>
                 {filteredVehicles.map((vehicle) => {
                   const isCompared = compareVehicles.some(v => v.id === vehicle.id);
-                  const displayPrice = vehicle.price;
+                  const monthlyEmi = calculateEMI(vehicle.price);
+                  const primarySpec = vehicle.isEV
+                    ? `${vehicle.rangeKm ?? "--"} km range`
+                    : vehicle.engineCc
+                    ? `${vehicle.engineCc} cc`
+                    : vehicle.fuel;
 
                   return (
-                    <div 
-                      key={vehicle.id}
-                      className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between group"
-                    >
-                      {/* Top Checkbox and Rating bar */}
-                      <div className="flex items-center justify-between mb-3">
-                        {/* Compare Checkbox */}
-                        <label className="flex items-center gap-1.5 cursor-pointer text-xs font-extrabold text-slate-500 select-none group-hover:text-blue-600 transition-colors">
-                          <input 
-                            type="checkbox"
-                            checked={isCompared}
-                            onChange={(e) => handleCompareCheck(vehicle, e.target.checked)}
-                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 focus:ring-2 accent-blue-600 cursor-pointer"
-                          />
-                          <span className="flex items-center gap-0.5"><CompareIcon /> Compare</span>
-                        </label>
+                    <div key={vehicle.id} className={cardStyles.card}>
+                      {/* Slide 1: photo (visible at rest) */}
+                      <div className={`${cardStyles.slide} ${cardStyles.slide1}`}>
+                        <VehiclePhoto vehicle={vehicle} />
 
-                        {/* Rating Badge */}
-                        <div className="flex items-center bg-yellow-50/70 border border-yellow-200 px-2 py-0.5 rounded-lg">
-                          <StarIcon />
-                          <span className="text-[11px] font-black text-slate-700">5.0</span>
+                        {/* Top overlay: compare checkbox + rating */}
+                        <div className={cardStyles.topbar}>
+                          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-extrabold text-slate-700 select-none bg-white/90 backdrop-blur-sm px-2.5 py-1.5 rounded-lg shadow-sm">
+                            <input
+                              type="checkbox"
+                              checked={isCompared}
+                              onChange={(e) => handleCompareCheck(vehicle, e.target.checked)}
+                              className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 focus:ring-2 accent-blue-600 cursor-pointer"
+                            />
+                            <span className="flex items-center gap-0.5"><CompareIcon /> Compare</span>
+                          </label>
+
+                          <div className="flex items-center bg-white/90 backdrop-blur-sm border border-yellow-200 px-2 py-1 rounded-lg shadow-sm">
+                            <StarIcon />
+                            <span className="text-[11px] font-black text-slate-700">5.0</span>
+                          </div>
+                        </div>
+
+                        {/* Caption: model + price, visible at rest */}
+                        <div className={cardStyles.caption}>
+                          <p className={cardStyles.captionModel}>{vehicle.brand} {vehicle.model}</p>
+                          <p className={cardStyles.captionPrice}>Rs. {vehicle.price.toLocaleString("en-NP")}</p>
                         </div>
                       </div>
 
-                      {/* Vehicle Image Placeholder */}
-                      <div className="h-32 w-full flex items-center justify-center bg-slate-50/80 rounded-xl overflow-hidden mb-4 border border-slate-100 group-hover:bg-slate-100/40 transition-colors relative">
-                        {/* Simulated Image */}
-                        <div className="w-24 h-12 bg-blue-500/10 rounded-full border border-blue-400/20 blur-md absolute"></div>
-                        <span className="text-4xl font-extrabold text-blue-500/30 z-10 uppercase tracking-tighter">
-                          {vehicle.brand}
-                        </span>
-                      </div>
+                      {/* Slide 2: detail panel that slides up on hover */}
+                      <div className={`${cardStyles.slide} ${cardStyles.slide2}`}>
+                        <div className={cardStyles.content}>
+                          <h3>{vehicle.brand} {vehicle.model}</h3>
+                          <p className={cardStyles.variant}>{vehicle.variant || "Standard"}</p>
 
-                      {/* Brand & Model Info */}
-                      <div className="mb-3">
-                        <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
-                          {vehicle.brand} {vehicle.model}
-                        </h4>
-                        <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                          {vehicle.variant || "Standard"}
-                        </p>
-                      </div>
-
-                      {/* Price Section */}
-                      <div className="mb-4">
-                        <p className="text-base font-black text-slate-900 tracking-tight">
-                          Rs. {displayPrice.toLocaleString("en-NP")}
-                        </p>
-                      </div>
-
-                      {/* Specs and links if Detailed Mode */}
-                      {viewMode === "detailed" && (
-                        <div className="border-t border-slate-100 pt-3 flex flex-col gap-3">
-                          {/* Specs Grid */}
-                          <div className="grid grid-cols-2 gap-2 text-xs font-bold text-slate-600">
-                            <div className="flex items-center">
-                              <BatteryIcon />
-                              <span>{vehicle.batteryKwh} kWh</span>
-                            </div>
-                            <div className="flex items-center justify-end">
-                              <RangeIcon />
-                              <span>{vehicle.rangeKm} kms</span>
-                            </div>
+                          <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-slate-500">
+                            <span>{primarySpec}</span>
+                            <span className="text-slate-300">&bull;</span>
+                            <span>{vehicle.seatingCapacity} Seats</span>
+                            <span className="text-slate-300">&bull;</span>
+                            <span>{vehicle.transmission}</span>
                           </div>
 
-                          {/* Used EV badge */}
-                          {vehicle.usedCount && vehicle.usedCount > 0 ? (
-                            <Link 
-                              href="#used-marketplace"
-                              className="bg-emerald-50 border border-emerald-100/80 text-emerald-700 hover:bg-emerald-100/60 rounded-xl py-2 px-3 text-center text-xs font-extrabold flex items-center justify-center gap-1 transition-colors"
-                            >
-                              <span>{vehicle.usedCount} Used EVs for sale</span>
-                              <span className="text-emerald-500 font-black">&gt;</span>
-                            </Link>
-                          ) : (
-                            <div className="py-2.5"></div>
-                          )}
-                        </div>
-                      )}
+                          <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
+                            <p className="text-sm font-black text-slate-900 leading-tight">
+                              Rs. {vehicle.price.toLocaleString("en-NP")}
+                            </p>
+                            <p className="text-[11px] font-bold text-blue-600 leading-tight">
+                              EMI from Rs. {monthlyEmi.toLocaleString("en-NP")}/mo
+                            </p>
+                          </div>
 
-                      {/* Action buttons (EMI Calculator link) */}
-                      <div className="mt-3 flex gap-2">
-                        <Link 
-                          href={`/vehicle/${vehicle.id}`} 
-                          className="flex-grow text-center border border-slate-200 text-slate-700 hover:bg-slate-50 font-extrabold text-xs py-2.5 rounded-xl transition-colors"
-                        >
-                          Details
-                        </Link>
-                        <button 
-                          onClick={() => setSelectedEmiVehicle(vehicle)}
-                          className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 font-extrabold text-xs px-3.5 py-2.5 rounded-xl flex items-center justify-center transition-colors"
-                          title="EMI Calculator"
-                        >
-                          <CalcIcon />
-                          <span>EMI</span>
-                        </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleCompareCheck(vehicle, !isCompared)}
+                              className={`flex-1 text-center font-extrabold text-xs py-2 rounded-xl border transition-colors ${
+                                isCompared
+                                  ? "bg-blue-600 text-white border-blue-600"
+                                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              {isCompared ? "Added ✓" : "Compare"}
+                            </button>
+                            <Link
+                              href={`/vehicle/${vehicle.id}`}
+                              className="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-2 rounded-xl transition-colors"
+                            >
+                              View Details
+                            </Link>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -631,85 +667,6 @@ function HomeContent() {
             )}
           </div>
         </div>
-
-        {/* 3. Used EV Marketplace Section */}
-        <section className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm flex flex-col gap-6" id="used-marketplace">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div>
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Used EV marketplace</h2>
-              <p className="text-xs text-slate-400 font-semibold mt-1">Direct from owners and verified dealers</p>
-            </div>
-            <button className="bg-blue-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">
-              View All 240+ &rarr;
-            </button>
-          </div>
-
-          {/* Carousel Viewport */}
-          <div className="relative">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 overflow-hidden">
-              {usedListings.slice(usedSliderIndex, usedSliderIndex + 4).map((used, idx) => (
-                <div 
-                  key={used.id}
-                  className="border border-slate-100 rounded-2xl overflow-hidden hover:shadow-md hover:border-slate-200 transition-all bg-slate-50/50 flex flex-col justify-between"
-                >
-                  {/* Photo Container */}
-                  <div className="h-40 bg-slate-100 flex items-center justify-center relative overflow-hidden group">
-                    <div className="w-16 h-8 bg-blue-500/10 rounded-full blur-md absolute"></div>
-                    <span className="text-2xl font-extrabold text-slate-400 uppercase tracking-widest">{used.vehicleBrand}</span>
-                    <span className="absolute top-3 left-3 bg-slate-900/60 backdrop-blur-md text-[10px] font-black text-white px-2 py-0.5 rounded">
-                      {used.sellerType}
-                    </span>
-                    <span className="absolute top-3 right-3 bg-emerald-600 text-[10px] font-black text-white px-2 py-0.5 rounded">
-                      {used.condition}
-                    </span>
-                  </div>
-
-                  {/* Body Content */}
-                  <div className="p-4 flex flex-col gap-3 flex-grow">
-                    <div>
-                      <h4 className="font-extrabold text-slate-900 text-sm line-clamp-1">
-                        {used.year} {used.vehicleBrand} {used.vehicleModel}
-                      </h4>
-                      <p className="text-[11px] font-bold text-slate-400 mt-0.5">
-                        {used.kmDriven.toLocaleString()} km • {used.location}
-                      </p>
-                    </div>
-
-                    <div className="mt-auto">
-                      <p className="text-sm font-black text-blue-600">
-                        Rs. {used.askingPrice.toLocaleString("en-NP")}
-                      </p>
-                      <button 
-                        onClick={() => alert(`Contacting Seller: ${used.sellerName} at 9841xxxxxx`)}
-                        className="w-full text-center bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs py-2 rounded-xl mt-3 block transition-all"
-                      >
-                        View Details
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Slider Navigation Arrows */}
-            {usedSliderIndex > 0 && (
-              <button 
-                onClick={() => setUsedSliderIndex(prev => Math.max(0, prev - 1))}
-                className="absolute top-1/2 -left-4 -translate-y-1/2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 w-9 h-9 rounded-full flex items-center justify-center shadow-md focus:outline-none z-10 font-bold"
-              >
-                &larr;
-              </button>
-            )}
-            {usedSliderIndex + 4 < usedListings.length && (
-              <button 
-                onClick={() => setUsedSliderIndex(prev => prev + 1)}
-                className="absolute top-1/2 -right-4 -translate-y-1/2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 w-9 h-9 rounded-full flex items-center justify-center shadow-md focus:outline-none z-10 font-bold"
-              >
-                &rarr;
-              </button>
-            )}
-          </div>
-        </section>
       </main>
 
       {/* 4. EMI Calculator Modal Popup */}
@@ -835,7 +792,7 @@ function HomeContent() {
           <Link href="#" className="hover:text-blue-600 transition-colors">Electric Scooters</Link>
           <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare EVs</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">EMI Calculator</Link>
-          <Link href="#used-marketplace" className="hover:text-blue-600 transition-colors">Used EVs</Link>
+          <Link href="/used" className="hover:text-blue-600 transition-colors">Used EVs</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">Brands</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">Charging Stations</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">News</Link>

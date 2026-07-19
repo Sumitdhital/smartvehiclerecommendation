@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 // already-confirmed, so signup works instantly without depending on the
 // (rate-limited) default confirmation email. The client signs in right after.
 export async function POST(req: Request) {
-  let body: { email?: string; password?: string; fullName?: string };
+  let body: { email?: string; password?: string; fullName?: string; accountType?: string };
   try {
     body = await req.json();
   } catch {
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
   const email = body.email?.trim();
   const password = body.password ?? "";
   const fullName = body.fullName?.trim() ?? "";
+  const accountType = body.accountType === "dealer" ? "dealer" : "individual";
 
   if (!email || !password) {
     return NextResponse.json({ error: "Enter your email and a password to continue." }, { status: 400 });
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: fullName },
+    user_metadata: { full_name: fullName, account_type: accountType },
   });
 
   if (error) {

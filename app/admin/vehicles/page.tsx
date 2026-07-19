@@ -2,6 +2,7 @@
 
 import React from "react";
 import ResourceManager, { ColumnDef, FieldDef } from "@/components/admin/ResourceManager";
+import SendFeedbackButton from "@/components/admin/SendFeedbackButton";
 
 interface VehicleRow {
   id: string;
@@ -92,6 +93,13 @@ export default function AdminVehiclesPage() {
       fields={fields}
       addLabel="Add vehicle"
       itemNoun="vehicle"
+      extraRowActions={(row) => (
+        <SendFeedbackButton
+          target="vehicle"
+          id={row.id}
+          label={`${row.brand} ${row.model} ${row.variant}`}
+        />
+      )}
       onRowOpen={(row) => {
         // Prefer the slug so the dashboard link resolves on the public page.
         const vehicleId =

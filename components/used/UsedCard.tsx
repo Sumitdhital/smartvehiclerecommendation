@@ -4,9 +4,17 @@ import React, { useState } from "react";
 import type { UsedCardData } from "@/lib/used-listings";
 import { BookTestDriveModal } from "@/components/vehicle/BookTestDriveModal";
 
+interface UsedCardProps {
+  item: UsedCardData;
+  currentUserId?: string;
+  /** When set, rent-type community listings show a "Request to Rent" button
+   *  that calls back into the parent (e.g. /rentals) to open the request modal. */
+  onRequestRent?: (item: UsedCardData) => void;
+}
+
 /** Marketplace listing card — same visual language as the old home section,
  *  with real photo support for community listings. */
-export function UsedCard({ item }: { item: UsedCardData }) {
+export function UsedCard({ item, onRequestRent }: UsedCardProps) {
   const [showPhone, setShowPhone] = useState(false);
   const [showTestDrive, setShowTestDrive] = useState(false);
 
@@ -101,6 +109,18 @@ export function UsedCard({ item }: { item: UsedCardData }) {
                 <path strokeLinecap="round" d="M16 3v4M8 3v4M3 10h18" />
               </svg>
               Book Test Drive
+            </button>
+          )}
+
+          {item.listingType === "rent" && onRequestRent && item.source === "community" && (
+            <button
+              onClick={() => onRequestRent(item)}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-slate-800"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
+              </svg>
+              Request to Rent
             </button>
           )}
         </div>

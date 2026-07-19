@@ -16,6 +16,8 @@ export interface TestDriveInput {
   vehicleLabel: string;
   /** Only set for community used listings — drives the owner notification. */
   listingId?: string;
+  /** Only set for catalog/new-car bookings — drives the vehicle owner notification. */
+  vehicleId?: string;
   fullName: string;
   phone: string;
   preferredDate: string; // yyyy-mm-dd
@@ -31,6 +33,7 @@ export async function createTestDriveBooking(
   const { error } = await supabase.from("test_drive_bookings").insert({
     booker_id: userId,
     listing_id: input.listingId ?? null,
+    vehicle_id: input.vehicleId ?? null,
     vehicle_label: input.vehicleLabel,
     full_name: input.fullName,
     phone: input.phone,

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useAppStore } from "@/lib/store";
-import { getVehicles, getVehicleById, getPopularComparisons, getAllComparisons, ExtendedVehicle } from "@/lib/vehicles-db";
+import { getVehiclesAsync, getPopularComparisons, getAllComparisons, ExtendedVehicle } from "@/lib/vehicles-db";
 import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -280,9 +280,15 @@ function ComparePageContent() {
   const [allComparisonsPage, setAllComparisonsPage] = useState(1);
   const compsPerPage = 5;
 
-  // Initialize catalogs
+  // Initialize catalogs (from Supabase)
   useEffect(() => {
-    setAllVehiclesList(getVehicles());
+    let active = true;
+    getVehiclesAsync().then((list) => {
+      if (active) setAllVehiclesList(list);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Sync selection based on URL search params (?ids=id1,id2) OR fall back to Zustand compared list
@@ -329,7 +335,7 @@ function ComparePageContent() {
     setSelectedIds(cleanIds);
     
     // Add to Zustand store as well
-    const vehicleObj = getVehicleById(id);
+    const vehicleObj = allVehiclesList.find(v => v.id === id);
     if (vehicleObj) {
       addToCompare(vehicleObj);
     }
@@ -385,9 +391,9 @@ function ComparePageContent() {
     { label: "Total Airbags", key: "totalAirbags", format: (v: ExtendedVehicle) => v.totalAirbags ? String(v.totalAirbags) : "N/A" }
   ];
 
-  // Resolve vehicles from selectedIds
+  // Resolve vehicles from selectedIds against the loaded catalog
   const comparedVehiclesList = selectedIds
-    .map(id => getVehicleById(id))
+    .map(id => allVehiclesList.find(v => v.id === id))
     .filter((v): v is ExtendedVehicle => v !== undefined);
 
   // Paginated "All Comparisons"

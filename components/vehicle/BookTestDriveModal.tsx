@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -12,11 +13,13 @@ interface Props {
   vehicleLabel: string;
   /** Only for community used listings — enables the owner notification. */
   listingId?: string;
+  /** Only for catalog/new-car bookings — enables the vehicle owner notification. */
+  vehicleId?: string;
 }
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export function BookTestDriveModal({ open, onClose, vehicleLabel, listingId }: Props) {
+export function BookTestDriveModal({ open, onClose, vehicleLabel, listingId, vehicleId }: Props) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -72,6 +75,7 @@ export function BookTestDriveModal({ open, onClose, vehicleLabel, listingId }: P
         {
           vehicleLabel,
           listingId,
+          vehicleId,
           fullName: fullName.trim(),
           phone: phone.trim(),
           preferredDate,

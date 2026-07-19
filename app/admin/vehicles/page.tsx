@@ -13,6 +13,7 @@ interface VehicleRow {
   fuel: string;
   price: number;
   is_featured: boolean;
+  sold: boolean;
   slug?: string | null;
   [key: string]: unknown;
 }
@@ -46,6 +47,16 @@ const columns: ColumnDef<VehicleRow>[] = [
     render: (row) => `रू ${Number(row.price).toLocaleString("en-IN")}`,
   },
   { key: "is_featured", label: "Featured" },
+  {
+    key: "sold",
+    label: "Status",
+    render: (row) =>
+      row.sold ? (
+        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-black text-slate-600">Sold</span>
+      ) : (
+        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-600">Available</span>
+      ),
+  },
 ];
 
 const fields: FieldDef[] = [
@@ -76,6 +87,7 @@ const fields: FieldDef[] = [
   { name: "used_count", label: "Used listings count", type: "number" },
   { name: "is_ev", label: "Electric vehicle", type: "checkbox" },
   { name: "is_featured", label: "Featured on home page", type: "checkbox" },
+  { name: "sold", label: "Sold (hides “Book a Test Drive”)", type: "checkbox" },
   { name: "key_features", label: "Key features", type: "tags", colSpan: 2, placeholder: "Sunroof, 360 camera, ADAS", help: "Comma-separated" },
   { name: "colors", label: "Colors", type: "tags", colSpan: 2, placeholder: "White, Black, Blue", help: "Comma-separated" },
   { name: "images", label: "Image URLs", type: "tags", colSpan: 2, placeholder: "/images/car1.png, /images/car2.png", help: "Comma-separated" },

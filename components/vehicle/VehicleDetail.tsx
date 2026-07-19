@@ -113,7 +113,7 @@ export default function VehicleDetail({
       </div>
 
       <BookTestDriveModal
-        open={showTestDrive}
+        open={showTestDrive && !v.sold}
         onClose={() => setShowTestDrive(false)}
         vehicleLabel={`${v.brand} ${v.model} ${v.variant}`.trim()}
         vehicleId={v.id}

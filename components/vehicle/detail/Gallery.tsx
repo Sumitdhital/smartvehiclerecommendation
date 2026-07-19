@@ -54,12 +54,19 @@ export function Gallery({
           />
         </div>
 
-        <button
-          onClick={onBookTestDrive}
-          className="inline-flex w-fit items-center gap-2.5 rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-bold text-white shadow-md transition-colors hover:bg-slate-800"
-        >
-          <I.calendar className="h-4 w-4" /> Book a Test Drive
-        </button>
+        {v.sold ? (
+          <div className="inline-flex w-fit flex-col gap-0.5 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm">
+            <span className="font-bold text-slate-500">Sold</span>
+            <span className="text-xs font-semibold text-slate-400">Test drives are unavailable for this car.</span>
+          </div>
+        ) : (
+          <button
+            onClick={onBookTestDrive}
+            className="inline-flex w-fit items-center gap-2.5 rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-bold text-white shadow-md transition-colors hover:bg-slate-800"
+          >
+            <I.calendar className="h-4 w-4" /> Book a Test Drive
+          </button>
+        )}
       </div>
 
       {/* thumbnail strip */}

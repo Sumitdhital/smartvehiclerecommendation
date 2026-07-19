@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useAppStore } from "@/lib/store";
@@ -6,7 +6,7 @@ import { getVehiclesAsync, getPopularComparisons, getAllComparisons, ExtendedVeh
 import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { UserMenu } from "@/components/auth/UserMenu";
+import { SiteHeader } from "@/components/SiteHeader";
 
 // Custom icons
 const CloseIcon = () => (
@@ -407,21 +407,7 @@ function ComparePageContent() {
   return (
     <div className="bg-slate-50 min-h-screen font-sans antialiased text-slate-800 flex flex-col justify-between">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-black text-xl text-blue-600 tracking-tight">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6 text-blue-600">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" />
-            </svg>
-            <span>SaaS Nepal</span>
-          </Link>
-          <div className="flex items-center gap-4 text-sm font-semibold text-slate-600">
-            <Link href="/" className="hover:text-blue-600 transition-colors">Find cars</Link>
-            <Link href="/#used-marketplace" className="hover:text-blue-600 transition-colors">Used car</Link>
-            <UserMenu signInClassName="bg-slate-900 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-xs transition-all" />
-          </div>
-        </div>
-      </header>
+      <SiteHeader active="compare" />
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow flex flex-col gap-8">
@@ -824,16 +810,12 @@ function ComparePageContent() {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-100 py-10 mt-12 w-full text-center flex flex-col gap-6">
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs sm:text-sm font-semibold text-slate-500">
-          <Link href="/" className="hover:text-blue-600 transition-colors">EV Price List</Link>
+          <Link href="/" className="hover:text-blue-600 transition-colors">Vehicle Price List</Link>
           <Link href="/" className="hover:text-blue-600 transition-colors">Electric Cars</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Electric Scooters</Link>
           <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare EVs</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">EMI Calculator</Link>
           <Link href="/#used-marketplace" className="hover:text-blue-600 transition-colors">Used EVs</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">Brands</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Charging Stations</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">News</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Community</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">About</Link>
         </div>
         <div className="text-slate-400 text-[11px] sm:text-xs font-bold uppercase tracking-wider">

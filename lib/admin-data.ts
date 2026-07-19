@@ -9,7 +9,7 @@ export const VEHICLE_COLUMNS = [
   "engine_cc", "seating_capacity", "transmission", "ground_clearance", "boot_space",
   "safety_rating", "total_airbags", "dimensions", "drive_type", "brand_slug", "slug",
   "is_ev", "is_featured", "year_launched", "used_count", "description",
-  "key_features", "colors", "images", "image_url", "owner_id",
+  "key_features", "colors", "images", "image_url", "owner_id", "sold",
 ] as const;
 
 export const VEHICLE_REQUIRED = ["brand", "model", "variant", "type", "fuel", "seating_capacity", "transmission", "price"];

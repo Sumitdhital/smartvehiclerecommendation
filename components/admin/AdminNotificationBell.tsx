@@ -81,7 +81,9 @@ export default function AdminNotificationBell() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl duration-150 animate-in fade-in slide-in-from-top-1 motion-reduce:animate-none"
+          // Bell sits at the right edge of the lg sidebar, so open rightward there;
+          // on mobile it's at the top-right of the bar and must open leftward.
+          className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl duration-150 animate-in fade-in slide-in-from-top-1 motion-reduce:animate-none lg:left-0 lg:right-auto"
         >
           <p className="border-b border-slate-100 px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-400">
             Notifications

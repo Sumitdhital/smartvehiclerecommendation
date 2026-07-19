@@ -99,7 +99,13 @@ export function UsedCard({ item, onRequestRent }: UsedCardProps) {
             </div>
           )}
 
-          {item.listingType === "sell" && (
+          {item.listingType === "sell" && item.sold && (
+            <div className="mt-2 w-full rounded-xl border border-slate-100 bg-slate-50 py-2 text-center text-xs font-bold text-slate-400">
+              Sold — no test drives
+            </div>
+          )}
+
+          {item.listingType === "sell" && !item.sold && (
             <button
               onClick={() => setShowTestDrive(true)}
               className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-slate-800"
@@ -127,7 +133,7 @@ export function UsedCard({ item, onRequestRent }: UsedCardProps) {
       </div>
 
       <BookTestDriveModal
-        open={showTestDrive}
+        open={showTestDrive && !item.sold}
         onClose={() => setShowTestDrive(false)}
         vehicleLabel={vehicleLabel}
         listingId={notifyListingId}

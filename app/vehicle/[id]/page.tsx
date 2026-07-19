@@ -76,7 +76,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-100 py-10 mt-12 w-full text-center flex flex-col gap-6">
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs sm:text-sm font-semibold text-slate-500">
-          <Link href="/" className="hover:text-blue-600 transition-colors">EV Price List</Link>
+          <Link href="/" className="hover:text-blue-600 transition-colors">Vehicle Price List</Link>
           <Link href="/" className="hover:text-blue-600 transition-colors">Electric Cars</Link>
           <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare EVs</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">EMI Calculator</Link>

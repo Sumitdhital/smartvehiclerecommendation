@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useAppStore } from "@/lib/store";
@@ -6,7 +6,7 @@ import { getVehiclesAsync, applyVehicleFilters, ExtendedVehicle } from "@/lib/ve
 import { calculateNepalOnRoadPrice } from "@/lib/tax-engine";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { UserMenu } from "@/components/auth/UserMenu";
+import { SiteHeader } from "@/components/SiteHeader";
 import cardStyles from "./car-card.module.css";
 
 // Simple custom inline SVG components for icons to ensure zero dependency mismatch issues
@@ -58,60 +58,6 @@ const CompareIcon = () => (
   </svg>
 );
 
-// CarsDropdown: a hover-activated dropdown menu with EV / Petrol options
-function CarsDropdown({ activeFuel }: { activeFuel: string }) {
-  const [open, setOpen] = React.useState(false);
-  return (
-    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button className={`flex items-center gap-1 font-semibold transition-colors ${
-        activeFuel ? "text-blue-600" : "text-slate-600 hover:text-blue-600"
-      }`}>
-        <span>Cars</span>
-        <svg className={`w-4 h-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden z-50 py-1.5">
-          <Link
-            href="/?fuel=ev"
-            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold transition-colors ${
-              activeFuel === 'ev' ? 'bg-blue-50 text-blue-600' : 'text-slate-700 hover:bg-slate-50 hover:text-blue-600'
-            }`}
-          >
-            <span className="text-base">⚡</span> EV
-            {activeFuel === 'ev' && <span className="ml-auto text-[10px] bg-blue-600 text-white rounded-full px-1.5 py-0.5">active</span>}
-          </Link>
-          <Link
-            href="/?fuel=petrol"
-            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold transition-colors ${
-              activeFuel === 'petrol' ? 'bg-orange-50 text-orange-600' : 'text-slate-700 hover:bg-slate-50 hover:text-orange-600'
-            }`}
-          >
-            <span className="text-base">⛽</span> Petrol
-            {activeFuel === 'petrol' && <span className="ml-auto text-[10px] bg-orange-500 text-white rounded-full px-1.5 py-0.5">active</span>}
-          </Link>
-          <Link
-            href="/?fuel=diesel"
-            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold transition-colors ${
-              activeFuel === 'diesel' ? 'bg-amber-50 text-amber-700' : 'text-slate-700 hover:bg-slate-50 hover:text-amber-700'
-            }`}
-          >
-            <span className="text-base">🛢️</span> Diesel
-            {activeFuel === 'diesel' && <span className="ml-auto text-[10px] bg-amber-600 text-white rounded-full px-1.5 py-0.5">active</span>}
-          </Link>
-          <div className="my-1 border-t border-slate-100" />
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
-          >
-            <span className="text-base">🚗</span> All Cars
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // VehiclePhoto: renders the vehicle's primary image, falling back to a
 // branded text placeholder when there's no image or it fails to load.
@@ -154,9 +100,6 @@ function HomeContent() {
   const [maxPriceLimit, setMaxPriceLimit] = useState<number | undefined>(undefined);
   const [sortBy, setSortBy] = useState("rating");
   const [viewMode, setViewMode] = useState<"detailed" | "compact">("detailed");
-
-  // Mobile navigation menu (shown below the lg breakpoint)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // EMI Calculator Modal State
   const [selectedEmiVehicle, setSelectedEmiVehicle] = useState<ExtendedVehicle | null>(null);
@@ -250,99 +193,7 @@ function HomeContent() {
   return (
     <div className="bg-slate-50 min-h-screen font-sans antialiased text-slate-800 flex flex-col justify-between">
       {/* 1. Header (Sticky Navbar) */}
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 font-black text-2xl text-blue-600 tracking-tight">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-8 h-8 text-blue-600">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" />
-              </svg>
-              <span>SaaS Nepal</span>
-            </Link>
-
-            {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-6 text-sm font-semibold text-slate-600">
-              <Link href="/" className="text-blue-600 hover:text-blue-700 transition-colors">Find cars</Link>
-              <Link href="/used" className="hover:text-blue-600 transition-colors">Used car</Link>
-              <Link href="/rentals" className="hover:text-blue-600 transition-colors">Rentals</Link>
-              {/* Cars dropdown */}
-              <CarsDropdown activeFuel={fuelFilter} />
-              <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare</Link>
-              <div className="flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors">
-                <span>Tools</span>
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
-              </div>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {compareVehicles.length > 0 && (
-              <Link
-                href="/compare"
-                className="bg-blue-600 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all flex items-center gap-1.5"
-                id="view-compare-btn"
-              >
-                <span>View Compare</span>
-                <span className="bg-white text-blue-600 w-5 h-5 rounded-full flex items-center justify-center text-xs font-black">
-                  {compareVehicles.length}
-                </span>
-              </Link>
-            )}
-            <UserMenu signInClassName="border border-slate-200 text-slate-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 font-bold px-4 sm:px-5 py-2 rounded-xl text-sm transition-all duration-200" />
-
-            {/* Mobile menu toggle */}
-            <button
-              onClick={() => setMobileMenuOpen((o) => !o)}
-              className="lg:hidden p-2 -mr-1 text-slate-600 hover:text-blue-600 transition-colors"
-              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={mobileMenuOpen}
-            >
-              {mobileMenuOpen ? (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
-              ) : (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation Panel */}
-        {mobileMenuOpen && (
-          <nav className="lg:hidden border-t border-slate-100 bg-white px-4 sm:px-6 py-4 flex flex-col gap-1 text-sm font-semibold text-slate-700 shadow-sm">
-            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Find cars</Link>
-            <Link href="/used" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Used car</Link>
-            <Link href="/rentals" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Rentals</Link>
-
-            {/* Cars — fuel type filters (same filter as the sidebar) */}
-            <div className="mt-1 px-3 pt-2 pb-1 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Cars</div>
-            <div className="grid grid-cols-2 gap-2 px-1">
-              {[
-                { label: "⚡ EV", href: "/?fuel=ev", key: "ev", active: "bg-blue-50 text-blue-600 border-blue-200" },
-                { label: "⛽ Petrol", href: "/?fuel=petrol", key: "petrol", active: "bg-orange-50 text-orange-600 border-orange-200" },
-                { label: "🛢️ Diesel", href: "/?fuel=diesel", key: "diesel", active: "bg-amber-50 text-amber-700 border-amber-200" },
-                { label: "🚗 All Cars", href: "/", key: "", active: "bg-slate-100 text-slate-700 border-slate-200" },
-              ].map((item) => (
-                <Link
-                  key={item.key || "all"}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`px-3 py-2.5 rounded-xl border text-center transition-colors ${
-                    fuelFilter === item.key
-                      ? item.active
-                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-
-            <Link href="/compare" onClick={() => setMobileMenuOpen(false)} className="mt-1 px-3 py-2.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors">Compare</Link>
-            <div className="px-3 py-2.5 rounded-xl text-slate-400">Tools</div>
-          </nav>
-        )}
-      </header>
+      <SiteHeader active="find" activeFuel={fuelFilter} />
 
       {/* 2. Main Page Layout */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow flex flex-col gap-8">
@@ -631,13 +482,18 @@ function HomeContent() {
                             <span>{vehicle.transmission}</span>
                           </div>
 
-                          <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
+                          <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
                             <p className="text-sm font-black text-slate-900 leading-tight">
                               Rs. {vehicle.price.toLocaleString("en-NP")}
                             </p>
-                            <p className="text-[11px] font-bold text-blue-600 leading-tight">
-                              EMI from Rs. {monthlyEmi.toLocaleString("en-NP")}/mo
-                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEmiVehicle(vehicle)}
+                              title={`EMI from Rs. ${monthlyEmi.toLocaleString("en-NP")}/mo`}
+                              className="flex items-center gap-1 text-[11px] font-extrabold text-blue-600 leading-tight px-2 py-1 rounded-lg border border-blue-100 bg-blue-50 hover:bg-blue-100 transition-colors whitespace-nowrap"
+                            >
+                              EMI Calculator
+                            </button>
                           </div>
 
                           <div className="flex gap-2">
@@ -787,16 +643,12 @@ function HomeContent() {
       {/* 5. Footer Layout */}
       <footer className="bg-white border-t border-slate-100 py-10 mt-12 w-full text-center flex flex-col gap-6">
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs sm:text-sm font-semibold text-slate-500">
-          <Link href="#" className="hover:text-blue-600 transition-colors">EV Price List</Link>
+          <Link href="#" className="hover:text-blue-600 transition-colors">Vehicle Price List</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">Electric Cars</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Electric Scooters</Link>
           <Link href="/compare" className="hover:text-blue-600 transition-colors">Compare EVs</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">EMI Calculator</Link>
           <Link href="/used" className="hover:text-blue-600 transition-colors">Used EVs</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">Brands</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Charging Stations</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">News</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Community</Link>
           <Link href="#" className="hover:text-blue-600 transition-colors">About</Link>
         </div>
 

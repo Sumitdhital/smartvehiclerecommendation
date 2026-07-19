@@ -19,6 +19,8 @@ export interface ExtendedVehicle extends Vehicle {
   torqueLabel?: string;
   /** Supabase auth user that owns this row (dealer / individual). */
   ownerId?: string;
+  /** Sold cars stay browsable but can no longer be booked for a test drive. */
+  sold?: boolean;
 }
 
 export const VEHICLES: ExtendedVehicle[] = [
@@ -920,6 +922,7 @@ interface VehicleRow {
   total_airbags: number | null;
   torque_label: string | null;
   owner_id: string | null;
+  sold: boolean | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -1005,6 +1008,7 @@ function mapVehicleRow(row: VehicleRow): ExtendedVehicle {
     totalAirbags: row.total_airbags ?? mock?.totalAirbags,
     torqueLabel: row.torque_label || mock?.torqueLabel,
     ownerId: row.owner_id ?? undefined,
+    sold: Boolean(row.sold),
   };
 }
 
